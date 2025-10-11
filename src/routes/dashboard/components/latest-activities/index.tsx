@@ -1,61 +1,79 @@
-import { useState, useEffect } from "react";
+import { useList } from "@refinedev/core";
+import type { GetFieldsFromList } from "@refinedev/nestjs-query";
 
 import { UnorderedListOutlined } from "@ant-design/icons";
 import { Card, List, Skeleton as AntdSkeleton, Space } from "antd";
 import dayjs from "dayjs";
 
 import { CustomAvatar, Text } from "@/components";
-import { mockLatestActivitiesAudits, mockLatestActivitiesDeals } from "@/providers/data/dashboard-mock-data";
+import type {
+  DashboardLatestActivitiesAuditsQuery,
+  DashboardLatestActivitiesDealsQuery,
+} from "@/graphql/types";
 
-type AuditItem = {
-  id: string;
-  action: string;
-  targetEntity: string;
-  targetId: string;
-  changes: Array<{ field: string; from: string; to: string }>;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    avatarUrl: string;
-  };
-};
-
-type DealItem = {
-  id: string;
-  title: string;
-  stage: {
-    id: string;
-    title: string;
-  };
-  company: {
-    id: string;
-    name: string;
-    avatarUrl: string;
-  };
-  createdAt: string;
-};
+import {
+  DASHBOARD_LATEST_ACTIVITIES_AUDITS_QUERY,
+  DASHBOARD_LATEST_ACTIVITIES_DEALS_QUERY,
+} from "./queries";
 
 type Props = { limit?: number };
 
 export const DashboardLatestActivities = ({ limit = 5 }: Props) => {
-  const [audit, setAudit] = useState<{ data: AuditItem[]; total: number } | null>(null);
-  const [deals, setDeals] = useState<{ data: DealItem[]; total: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    result: audit,
 
-  useEffect(() => {
-    // Simulate API calls - Replace with actual REST API calls later
-    // Example: 
-    // fetch(`${API_URL}/dashboard/audits?action=CREATE,UPDATE&targetEntity=Deal&limit=${limit}`)
-    // fetch(`${API_URL}/dashboard/deals?ids=${dealIds.join(',')}`)
-    const timer = setTimeout(() => {
-      setAudit(mockLatestActivitiesAudits);
-      setDeals(mockLatestActivitiesDeals);
-      setIsLoading(false);
-    }, 500);
+    query: { isLoading: isLoadingAudit, isError, error },
+  } = useList<GetFieldsFromList<DashboardLatestActivitiesAuditsQuery>>({
+    resource: "audits",
+    pagination: {
+      pageSize: limit,
+    },
+    sorters: [
+      {
+        field: "createdAt",
+        order: "desc",
+      },
+    ],
+    filters: [
+      {
+        field: "action",
+        operator: "in",
+        value: ["CREATE", "UPDATE"],
+      },
+      {
+        field: "targetEntity",
+        operator: "eq",
+        value: "Deal",
+      },
+    ],
+    meta: {
+      gqlQuery: DASHBOARD_LATEST_ACTIVITIES_AUDITS_QUERY,
+    },
+  });
 
-    return () => clearTimeout(timer);
-  }, [limit]);
+  const dealIds = audit?.data?.map((audit) => audit.targetId);
+
+  const {
+    result: deals,
+    query: { isLoading: isLoadingDeals },
+  } = useList<GetFieldsFromList<DashboardLatestActivitiesDealsQuery>>({
+    resource: "deals",
+    queryOptions: { enabled: !!dealIds?.length },
+    pagination: {
+      mode: "off",
+    },
+    filters: [{ field: "id", operator: "in", value: dealIds }],
+    meta: {
+      gqlQuery: DASHBOARD_LATEST_ACTIVITIES_DEALS_QUERY,
+    },
+  });
+
+  if (isError) {
+    console.error("Error fetching latest activities", error);
+    return null;
+  }
+
+  const isLoading = isLoadingAudit || isLoadingDeals;
 
   return (
     <Card

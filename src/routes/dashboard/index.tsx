@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useCustom } from "@refinedev/core";
 
 import { Col, Row } from "antd";
 
-import { mockDashboardTotalCounts } from "@/providers/data/dashboard-mock-data";
+import type { DashboardTotalCountsQuery } from "@/graphql/types";
 
 import {
   CalendarUpcomingEvents,
@@ -10,21 +10,18 @@ import {
   DashboardLatestActivities,
   DashboardTotalCountCard,
 } from "./components";
+import { DASHBOARD_TOTAL_COUNTS_QUERY } from "./queries";
 
 export const DashboardPage = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [data, setData] = useState(mockDashboardTotalCounts);
+  const {
+    query: { isLoading },
 
-  useEffect(() => {
-    // Simulate API call - Replace this with actual REST API call later
-    // Example: fetch(`${API_URL}/dashboard/total-counts`)
-    const timer = setTimeout(() => {
-      setData(mockDashboardTotalCounts);
-      setIsLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
+    result: data,
+  } = useCustom<DashboardTotalCountsQuery>({
+    url: "",
+    method: "get",
+    meta: { gqlQuery: DASHBOARD_TOTAL_COUNTS_QUERY },
+  });
 
   return (
     <div className="page-container">
@@ -33,21 +30,21 @@ export const DashboardPage = () => {
           <DashboardTotalCountCard
             resource="companies"
             isLoading={isLoading}
-            totalCount={data?.companies?.totalCount ?? 0}
+            totalCount={data?.data?.companies?.totalCount ?? 0}
           />
         </Col>
         <Col xs={24} sm={24} xl={8}>
           <DashboardTotalCountCard
             resource="contacts"
             isLoading={isLoading}
-            totalCount={data?.contacts?.totalCount ?? 0}
+            totalCount={data?.data?.contacts?.totalCount ?? 0}
           />
         </Col>
         <Col xs={24} sm={24} xl={8}>
           <DashboardTotalCountCard
             resource="deals"
             isLoading={isLoading}
-            totalCount={data?.deals?.totalCount ?? 0}
+            totalCount={data?.data?.deals?.totalCount ?? 0}
           />
         </Col>
       </Row>

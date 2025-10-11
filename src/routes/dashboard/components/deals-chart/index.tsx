@@ -1,26 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+
+import { useList } from "@refinedev/core";
+import type { GetFieldsFromList } from "@refinedev/nestjs-query";
 
 import { DollarOutlined } from "@ant-design/icons";
 import { Area, type AreaConfig } from "@ant-design/plots";
 import { Card } from "antd";
 
 import { Text } from "@/components";
-import { mockDealStages } from "@/providers/data/dashboard-mock-data";
+import type { DashboardDealsChartQuery } from "@/graphql/types";
 
+import { DASHBOARD_DEALS_CHART_QUERY } from "./queries";
 import { mapDealsData } from "./utils";
 
 export const DashboardDealsChart = () => {
-  const [data, setData] = useState<any>(null);
-
-  useEffect(() => {
-    // Simulate API call - Replace this with actual REST API call later
-    // Example: fetch(`${API_URL}/dashboard/deal-stages?filter=WON,LOST`)
-    const timer = setTimeout(() => {
-      setData(mockDealStages);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
+  const { result: data } = useList<GetFieldsFromList<DashboardDealsChartQuery>>(
+    {
+      resource: "dealStages",
+      filters: [{ field: "title", operator: "in", value: ["WON", "LOST"] }],
+      meta: {
+        gqlQuery: DASHBOARD_DEALS_CHART_QUERY,
+      },
+    },
+  );
 
   const dealData = React.useMemo(() => {
     return mapDealsData(data?.data);

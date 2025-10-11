@@ -1,18 +1,19 @@
-import { useState, useEffect } from "react";
-import { useGetIdentity } from "@refinedev/core";
+import { SaveButton, useForm } from "@refinedev/antd";
+import type { HttpError } from "@refinedev/core";
+import type { GetFields, GetVariables } from "@refinedev/nestjs-query";
 
 import { CloseOutlined } from "@ant-design/icons";
-import { Button, Card, Drawer, Form, Input, Spin, message } from "antd";
+import { Button, Card, Drawer, Form, Input, Spin } from "antd";
 
-import { API_BASE_URL } from "@/providers/data";
+import type {
+  UpdateUserMutation,
+  UpdateUserMutationVariables,
+} from "@/graphql/types";
 import { getNameInitials } from "@/utilities";
 
 import { CustomAvatar } from "../../custom-avatar";
 import { Text } from "../../text";
-
-// Default avatar image - can be replaced with your own default image URL
-const DEFAULT_AVATAR =
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Default";
+import { UPDATE_USER_MUTATION } from "./queries";
 
 type Props = {
   opened: boolean;
@@ -20,123 +21,31 @@ type Props = {
   userId: string;
 };
 
-type UserData = {
-  id: string;
-  name: string;
-  email: string;
-  mobile?: string;
-  avatarUrl?: string;
-};
-
-/**
- * Get CSRF token from cookie
- */
-const getCsrfToken = (): string | null => {
-  const cookies = document.cookie.split(";");
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split("=");
-    if (name === "csrf_access_token") {
-      return value;
-    }
-  }
-  return null;
-};
-
 export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
-  const [form] = Form.useForm();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const { data: identity } = useGetIdentity<UserData>();
-
-  useEffect(() => {
-    if (opened && userId) {
-      fetchUserData();
-    }
-  }, [opened, userId]);
-
-  const fetchUserData = async () => {
-    setIsLoading(true);
-    try {
-      const csrfToken = getCsrfToken();
-      const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-        method: "GET",
-        credentials: "include",
-        headers: csrfToken
-          ? {
-              "X-CSRF-Token": csrfToken,
-            }
-          : {},
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch user data");
-      }
-
-      const data = await response.json();
-      const user: UserData = {
-        id: data.id,
-        name: data.name || data.email,
-        email: data.email,
-        mobile: data.mobile,
-        avatarUrl: data.avatar_url,
-      };
-
-      setUserData(user);
-      form.setFieldsValue({
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-      });
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      message.error("Failed to load user data");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSave = async (values: any) => {
-    setIsSaving(true);
-    try {
-      const csrfToken = getCsrfToken();
-      const response = await fetch(`${API_BASE_URL}/v1/user/${userId}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-        },
-        body: JSON.stringify({
-          name: values.name,
-          email: values.email,
-          mobile: values.mobile,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update user data");
-      }
-
-      message.success("Account settings updated successfully");
-      setOpened(false);
-    } catch (error) {
-      console.error("Error updating user data:", error);
-      message.error("Failed to update account settings");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const {
+    saveButtonProps,
+    formProps,
+    query: queryResult,
+  } = useForm<
+    GetFields<UpdateUserMutation>,
+    HttpError,
+    GetVariables<UpdateUserMutationVariables>
+  >({
+    mutationMode: "optimistic",
+    resource: "users",
+    action: "edit",
+    id: userId,
+    meta: {
+      gqlMutation: UPDATE_USER_MUTATION,
+    },
+  });
+  const { avatarUrl, name } = queryResult?.data?.data || {};
 
   const closeModal = () => {
     setOpened(false);
   };
 
-  if (!opened) {
-    return null;
-  }
-
-  if (isLoading) {
+  if (queryResult?.isLoading) {
     return (
       <Drawer
         open={opened}
@@ -174,7 +83,7 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
           backgroundColor: "#fff",
         }}
       >
-        <Text strong> Account Settings </Text>
+        <Text strong>Account Settings</Text>
         <Button
           type="text"
           icon={<CloseOutlined />}
@@ -187,51 +96,37 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
         }}
       >
         <Card>
-          <CustomAvatar
-            shape="square"
-            src={DEFAULT_AVATAR}
-            name={getNameInitials(userData?.name || "")}
-            style={{
-              width: 96,
-              height: 96,
-              marginBottom: "24px",
-            }}
-          />
-          <Form form={form} layout="vertical" onFinish={handleSave}>
-            <Form.Item
-              label="Name"
-              name="name"
-              rules={[{ required: true, message: "Please enter your name" }]}
-            >
+          <Form {...formProps} layout="vertical">
+            <CustomAvatar
+              shape="square"
+              src={avatarUrl}
+              name={getNameInitials(name || "")}
+              style={{
+                width: 96,
+                height: 96,
+                marginBottom: "24px",
+              }}
+            />
+            <Form.Item label="Name" name="name">
               <Input placeholder="Name" />
             </Form.Item>
-            <Form.Item
-              label="Email"
-              name="email"
-              rules={[
-                { required: true, message: "Please enter your email" },
-                { type: "email", message: "Please enter a valid email" },
-              ]}
-            >
-              <Input placeholder="Email" />
+            <Form.Item label="Email" name="email">
+              <Input placeholder="email" />
             </Form.Item>
-            <Form.Item label="Mobile" name="mobile">
-              <Input placeholder="Mobile" />
+            <Form.Item label="Job title" name="jobTitle">
+              <Input placeholder="jobTitle" />
             </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isSaving}
-                style={{
-                  display: "block",
-                  marginLeft: "auto",
-                }}
-              >
-                Save
-              </Button>
+            <Form.Item label="Phone" name="phone">
+              <Input placeholder="Timezone" />
             </Form.Item>
           </Form>
+          <SaveButton
+            {...saveButtonProps}
+            style={{
+              display: "block",
+              marginLeft: "auto",
+            }}
+          />
         </Card>
       </div>
     </Drawer>
