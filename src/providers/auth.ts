@@ -61,11 +61,15 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // Store CSRF token from response header for cross-origin scenarios
-      // (JavaScript can't reliably read httponly=false cookies in cross-origin contexts)
-      const csrfToken = response.headers.get("X-CSRF-Token");
-      if (csrfToken) {
-        localStorage.setItem("csrf_access_token", csrfToken);
+      // After successful login, try to read CSRF token from cookie and store in localStorage
+      // This helps with cross-origin scenarios where JavaScript might not be able to read cookies
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'csrf_access_token' && value) {
+          localStorage.setItem('csrf_access_token', value);
+          break;
+        }
       }
 
       // Fetch the user's organizations to get org_id
@@ -142,31 +146,45 @@ export const authProvider: AuthProvider = {
   },
   check: async () => {
     try {
-      // Check if user has authentication cookie before making request
-      const csrfToken = getCsrfToken();
       const basePath = getBasePath();
       const loginPath = basePath ? `${basePath}/login` : "/login";
 
-      if (!csrfToken) {
-        // No CSRF token means user is not authenticated
-        return {
-          authenticated: false,
-          redirectTo: loginPath,
-        };
-      }
+      // Try to get CSRF token from localStorage or cookies
+      const csrfToken = getCsrfToken();
 
+      // Make a request to check if user is authenticated
+      // The cookies will be sent automatically with credentials: "include"
       const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
         method: "GET",
         credentials: "include",
-        headers: {
+        headers: csrfToken ? {
           "X-CSRF-Token": csrfToken,
-        },
+        } : {},
       });
 
       if (response.ok) {
+        // If we successfully got the user but don't have a CSRF token in localStorage,
+        // try to extract it from the cookie and store it
+        if (!csrfToken) {
+          const cookies = document.cookie.split(';');
+          for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrf_access_token' && value) {
+              localStorage.setItem('csrf_access_token', value);
+              break;
+            }
+          }
+        }
+
         return {
           authenticated: true,
         };
+      }
+
+      // If response is 401, clear any stored tokens
+      if (response.status === 401) {
+        localStorage.removeItem('csrf_access_token');
+        localStorage.removeItem('org_id');
       }
 
       return {
