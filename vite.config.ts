@@ -4,7 +4,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: "/OceanCRM_Web_App_Refine/",
+  base: process.env.VITE_BASE_PATH || "/",
   plugins: [tsconfigPaths({ root: __dirname }), react()],
   build: {
     rollupOptions: {

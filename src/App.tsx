@@ -32,8 +32,11 @@ import "@ant-design/v5-patch-for-react-19";
 import "@refinedev/antd/dist/reset.css";
 
 const App = () => {
+  // Use base path only for GitHub Pages builds
+  const basename = import.meta.env.VITE_BASE_PATH || "";
+  
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <ConfigProvider theme={RefineThemes.Blue}>
         <AntdApp>
           <DevtoolsProvider>
