@@ -152,34 +152,20 @@ export const authProvider: AuthProvider = {
       const basePath = getBasePath();
       const loginPath = basePath ? `${basePath}/login` : "/login";
 
-      // Check if we're already on the login page - if so, don't make unnecessary requests
-      const currentPath = window.location.pathname;
-      const isOnLoginPage = currentPath === loginPath || currentPath.endsWith('/login');
-
       // Try to get CSRF token from localStorage or cookies
       const csrfToken = getCsrfToken();
 
-      // If no CSRF token and we're not on login page, we're not authenticated
+      // If no CSRF token, we're not authenticated
       if (!csrfToken) {
-        if (!isOnLoginPage) {
-          // Clear any stale data
-          localStorage.removeItem('org_id');
-        }
+        // Clear any stale data
+        localStorage.removeItem('org_id');
         return {
           authenticated: false,
           redirectTo: loginPath,
         };
       }
 
-      // If we're on the login page with a token, we might be authenticated
-      // Make a quick check
-      if (isOnLoginPage) {
-        return {
-          authenticated: false,
-          redirectTo: loginPath,
-        };
-      }
-
+      // We have a CSRF token, verify with the API
       // Make a request to check if user is authenticated
       // The cookies will be sent automatically with credentials: "include"
       const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
