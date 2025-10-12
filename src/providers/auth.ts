@@ -11,13 +11,6 @@ export const authCredentials = {
 };
 
 /**
- * Get the base path for the app (important for GitHub Pages deployment)
- */
-const getBasePath = (): string => {
-  return import.meta.env.VITE_BASE_PATH || "";
-};
-
-/**
  * Get CSRF token from cookie or localStorage
  */
 const getCsrfToken = (): string | null => {
@@ -126,8 +119,8 @@ export const authProvider: AuthProvider = {
       }
 
       // Cookies are automatically stored by the browser
-      const basePath = getBasePath();
-      const redirectPath = basePath ? `${basePath}/` : "/";
+      // Use "/" because Vite's base config already handles the base path
+      const redirectPath = "/";
 
       console.log("[LOGIN] ✅ Login successful, redirecting to:", redirectPath);
       console.log("[LOGIN] localStorage csrf_access_token:", localStorage.getItem('csrf_access_token'));
@@ -168,10 +161,10 @@ export const authProvider: AuthProvider = {
     localStorage.removeItem("org_id");
     localStorage.removeItem("csrf_access_token");
 
-    const basePath = getBasePath();
+    // Use "/login" because Vite's base config already handles the base path
     return {
       success: true,
-      redirectTo: basePath ? `${basePath}/login` : "/login",
+      redirectTo: "/login",
     };
   },
   onError: async (error) => {
@@ -186,8 +179,8 @@ export const authProvider: AuthProvider = {
   },
   check: async () => {
     try {
-      const basePath = getBasePath();
-      const loginPath = basePath ? `${basePath}/login` : "/login";
+      // Use "/login" because Vite's base config already handles the base path
+      const loginPath = "/login";
 
       console.log("[CHECK] Starting auth check...");
       console.log("[CHECK] Current path:", window.location.pathname);
@@ -250,10 +243,9 @@ export const authProvider: AuthProvider = {
       };
     } catch (error) {
       console.error("[CHECK] ❌ Exception:", error);
-      const basePath = getBasePath();
       return {
         authenticated: false,
-        redirectTo: basePath ? `${basePath}/login` : "/login",
+        redirectTo: "/login",
       };
     }
   },
