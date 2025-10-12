@@ -1,194 +1,249 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { type HttpError, useGo, useList, useUpdate } from "@refinedev/core";
-import type { GetFieldsFromList } from "@refinedev/nestjs-query";
 
 import type { DragEndEvent } from "@dnd-kit/core";
-
-import type { TaskUpdateInput } from "@/graphql/schema.types";
-import type { TasksQuery, TaskStagesQuery } from "@/graphql/types";
 
 import { KanbanAddCardButton } from "../components";
 import { KanbanBoard, KanbanBoardContainer } from "./kanban/board";
 import { ProjectCardMemo, ProjectCardSkeleton } from "./kanban/card";
 import { KanbanColumn, KanbanColumnSkeleton } from "./kanban/column";
 import { KanbanItem } from "./kanban/item";
-import {
-  TASK_STAGES_QUERY,
-  TASKS_QUERY,
-  UPDATE_TASK_STAGE_MUTATION,
-} from "./queries";
+import { Text } from "@/components";
+import { LeadDetailModal } from "./lead-detail-modal";
 
-type Task = GetFieldsFromList<TasksQuery>;
-type TaskStage = GetFieldsFromList<TaskStagesQuery> & { tasks: Task[] };
+// Format currency for INR
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
+type Lead = {
+  id: string;
+  since: string;
+  stage: string;
+  tags: string[];
+  requirements: string;
+  notes: string;
+  potential: number;
+  business: {
+    id: string;
+    business: string;
+    name: string;
+    title?: string;
+    designation?: string;
+    mobile: string;
+    email: string;
+    website?: string;
+    address_line_1?: string;
+    address_line_2?: string;
+    country?: string;
+    city?: string;
+    gstin?: string;
+    code?: string;
+  };
+  product?: {
+    id: number;
+    name: string;
+  };
+  source?: {
+    id: number;
+    name: string;
+    is_default?: boolean;
+  };
+  assigned_user?: {
+    id: string;
+    name: string;
+  };
+};
+
+type LeadStage = {
+  id: string;
+  title: string;
+  leads: Lead[];
+  totalPotential: number;
+};
+
+const STAGE_ORDER = [
+  "Raw (Unqualified)",
+  "New",
+  "Discussion",
+  "Demo",
+  "Proposal",
+  "Decided",
+  "Rejected",
+];
 
 export const TasksListPage = ({ children }: React.PropsWithChildren) => {
   const go = useGo();
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const {
-    result: stages,
-    query: { isLoading: isLoadingStages },
-  } = useList<TaskStage>({
-    resource: "taskStages",
-    filters: [
-      {
-        field: "title",
-        operator: "in",
-        value: ["TODO", "IN PROGRESS", "IN REVIEW", "DONE"],
-      },
-    ],
-    sorters: [
-      {
-        field: "createdAt",
-        order: "asc",
-      },
-    ],
-    meta: {
-      gqlQuery: TASK_STAGES_QUERY,
-    },
-  });
-
-  const {
-    result: tasks,
-    query: { isLoading: isLoadingTasks },
-  } = useList<GetFieldsFromList<TasksQuery>>({
-    resource: "tasks",
-    sorters: [
-      {
-        field: "dueDate",
-        order: "asc",
-      },
-    ],
-    queryOptions: {
-      enabled: !!stages,
-    },
+    result: { data: leadsData },
+    query: { isLoading: isLoadingLeads },
+  } = useList<Lead>({
+    resource: "lead",
     pagination: {
       mode: "off",
     },
-    meta: {
-      gqlQuery: TASKS_QUERY,
-    },
+    sorters: [
+      {
+        field: "since",
+        order: "desc",
+      },
+    ],
   });
 
-  // group tasks by stage
-  // it's convert Task[] to TaskStage[] (group by stage) for kanban
-  // uses `stages` and `tasks` from useList hooks
-  const taskStages = React.useMemo(() => {
-    if (!tasks?.data || !stages?.data)
+  // Group leads by stage
+  const leadStages = React.useMemo(() => {
+    if (!leadsData) return [];
+
+    const grouped = STAGE_ORDER.map((stage) => {
+      const stageLeads = leadsData.filter((lead: Lead) => lead.stage === stage);
+      const totalPotential = stageLeads.reduce(
+        (sum: number, lead: Lead) => sum + (lead.potential || 0),
+        0,
+      );
+
       return {
-        unassignedStage: [],
-        stages: [],
+        id: stage,
+        title: stage,
+        leads: stageLeads,
+        totalPotential,
       };
+    });
 
-    const unassignedStage = tasks.data.filter((task) => task.stageId === null);
+    return grouped;
+  }, [leadsData]);
 
-    // prepare unassigned stage
-    const grouped: TaskStage[] = stages.data.map((stage) => ({
-      ...stage,
-      tasks: tasks.data.filter((task) => task.stageId?.toString() === stage.id),
-    }));
-
-    return {
-      unassignedStage,
-      columns: grouped,
-    };
-  }, [tasks, stages]);
-
-  const { mutate: updateTask } = useUpdate<Task, HttpError, TaskUpdateInput>({
-    resource: "tasks",
+  const { mutate: updateLead } = useUpdate<Lead, HttpError>({
+    resource: "lead",
     mutationMode: "optimistic",
-    successNotification: false,
-    meta: {
-      gqlMutation: UPDATE_TASK_STAGE_MUTATION,
+    successNotification: {
+      message: "Lead stage updated successfully",
+      type: "success",
     },
   });
 
   const handleOnDragEnd = (event: DragEndEvent) => {
-    let stageId = event.over?.id as undefined | string | null;
-    const taskId = event.active.id as string;
-    const taskStageId = event.active.data.current?.stageId;
+    const newStage = event.over?.id as string;
+    const leadId = event.active.id as string;
+    const currentStage = event.active.data.current?.stage;
 
-    if (taskStageId === stageId) {
+    if (currentStage === newStage) {
       return;
     }
 
-    if (stageId === "unassigned") {
-      stageId = null;
-    }
+    // Find the lead to get all its data
+    const lead = leadsData?.find((l: Lead) => l.id === leadId);
 
-    updateTask({
-      id: taskId,
+    if (!lead) return;
+    updateLead({
+      id: leadId,
       values: {
-        stageId: stageId,
-      },
+        stage: newStage,
+        assigned_to: lead.assigned_user?.id,
+        tags: lead.tags || [],
+        source_id: lead.source?.id,
+        product_id: lead.product?.id,
+        potential: lead.potential,
+        requirements: lead.requirements,
+        notes: lead.notes,
+        business: {
+          id: lead.business.id,
+          business: lead.business.business,
+          name: lead.business.name,
+          title: lead.business.title || null,
+          designation: lead.business.designation || "",
+          mobile: lead.business.mobile,
+          email: lead.business.email,
+          website: lead.business.website || "",
+          address_line_1: lead.business.address_line_1 || "",
+          address_line_2: lead.business.address_line_2 || "",
+          city: lead.business.city || "",
+          country: lead.business.country || "",
+          gstin: lead.business.gstin || "",
+          code: lead.business.code || "",
+        },
+        since: lead.since,
+      } as any,
     });
   };
 
   const handleAddCard = (args: { stageId: string }) => {
-    const path =
-      args.stageId === "unassigned"
-        ? "/tasks/new"
-        : `/tasks/new?stageId=${args.stageId}`;
-
-    go({ to: path, type: "replace" });
+    go({ to: `/leads?create=true&stage=${args.stageId}`, type: "replace" });
   };
 
-  const isLoading = isLoadingTasks || isLoadingStages;
+  const handleCardClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setModalOpen(true);
+  };
 
-  if (isLoading) return <PageSkeleton />;
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedLead(null);
+  };
+
+  if (isLoadingLeads) return <PageSkeleton />;
 
   return (
     <>
       <KanbanBoardContainer>
         <KanbanBoard onDragEnd={handleOnDragEnd}>
-          <KanbanColumn
-            id={"unassigned"}
-            title={"unassigned"}
-            count={taskStages?.unassignedStage?.length || 0}
-            onAddClick={() => handleAddCard({ stageId: "unassigned" })}
-          >
-            {taskStages.unassignedStage?.map((task) => {
-              return (
-                <KanbanItem
-                  key={task.id}
-                  id={task.id}
-                  data={{ ...task, stageId: "unassigned" }}
-                >
-                  <ProjectCardMemo
-                    {...task}
-                    dueDate={task.dueDate || undefined}
-                  />
-                </KanbanItem>
-              );
-            })}
-            {!taskStages.unassignedStage?.length && (
-              <KanbanAddCardButton
-                onClick={() => handleAddCard({ stageId: "unassigned" })}
-              />
-            )}
-          </KanbanColumn>
-          {taskStages.columns?.map((column) => {
+          {leadStages.map((column) => {
             return (
               <KanbanColumn
                 key={column.id}
                 id={column.id}
                 title={column.title}
-                count={column.tasks.length}
+                count={column.leads.length}
+                description={
+                  <Text
+                    size="lg"
+                    strong
+                    style={{ marginTop: "8px", display: "block" }}
+                  >
+                    {formatCurrency(column.totalPotential)}
+                  </Text>
+                }
                 onAddClick={() => handleAddCard({ stageId: column.id })}
               >
-                {isLoading && <ProjectCardSkeleton />}
-                {!isLoading &&
-                  column.tasks.map((task) => {
+                {isLoadingLeads && <ProjectCardSkeleton />}
+                {!isLoadingLeads &&
+                  column.leads.map((lead: Lead) => {
                     return (
-                      <KanbanItem key={task.id} id={task.id} data={task}>
+                      <KanbanItem
+                        key={lead.id}
+                        id={lead.id}
+                        data={{ ...lead, stageId: column.id }}
+                      >
                         <ProjectCardMemo
-                          {...task}
-                          dueDate={task.dueDate || undefined}
+                          id={lead.id}
+                          title={lead.business.business}
+                          updatedAt={lead.since}
+                          dueDate={lead.since}
+                          users={
+                            lead.assigned_user
+                              ? [
+                                  {
+                                    id: lead.assigned_user.id,
+                                    name: lead.assigned_user.name,
+                                    avatarUrl: undefined,
+                                  },
+                                ]
+                              : []
+                          }
+                          onCardClick={() => handleCardClick(lead)}
                         />
                       </KanbanItem>
                     );
                   })}
-                {!column.tasks.length && (
+                {!column.leads.length && (
                   <KanbanAddCardButton
                     onClick={() =>
                       handleAddCard({
@@ -202,13 +257,18 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
           })}
         </KanbanBoard>
       </KanbanBoardContainer>
+      <LeadDetailModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        lead={selectedLead}
+      />
       {children}
     </>
   );
 };
 
 const PageSkeleton = () => {
-  const columnCount = 6;
+  const columnCount = 7;
   const itemCount = 4;
 
   return (

@@ -1,13 +1,22 @@
 import React from "react";
-import { useModalForm } from "@refinedev/antd";
+import { useModalForm, useSelect } from "@refinedev/antd";
 import { Form, Input, Modal, Select } from "antd";
 import type { HttpError } from "@refinedev/core";
 
 type ContactFormValues = {
+  business_id: string;
   name: string;
   email: string;
   mobile: string;
-  business_id: string;
+};
+
+type Lead = {
+  id: string;
+  business: {
+    id: string;
+    business: string;
+    name: string;
+  };
 };
 
 type Props = {
@@ -30,11 +39,21 @@ export const ContactFormModal = ({
   >({
     action,
     id: contactId,
-    resource: "contacts",
+    resource: "contact",
     redirect: false,
     onMutationSuccess: () => {
       form.resetFields();
       onClose();
+    },
+  });
+
+  // Fetch leads to get business information
+  const { selectProps: businessSelectProps } = useSelect<Lead>({
+    resource: "lead",
+    optionLabel: (item) => item.business.business,
+    optionValue: (item) => item.business.id,
+    pagination: {
+      mode: "off",
     },
   });
 
@@ -51,11 +70,35 @@ export const ContactFormModal = ({
         {...formProps}
         layout="vertical"
         initialValues={{
+          business_id: "",
           name: "",
           email: "",
           mobile: "",
         }}
       >
+        <Form.Item
+          label="Company"
+          name="business_id"
+          rules={[
+            {
+              required: true,
+              message: "Please select a company",
+            },
+          ]}
+        >
+          <Select
+            {...businessSelectProps}
+            placeholder="Select a company"
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? "")
+                .toString()
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
+
         <Form.Item
           label="Name"
           name="name"
@@ -70,25 +113,12 @@ export const ContactFormModal = ({
         </Form.Item>
 
         <Form.Item
-          label="Email"
-          name="email"
-          rules={[
-            {
-              type: "email",
-              message: "Please enter a valid email",
-            },
-          ]}
-        >
-          <Input placeholder="contact@example.com" />
-        </Form.Item>
-
-        <Form.Item
           label="Mobile"
           name="mobile"
           rules={[
             {
-              pattern: /^[0-9+\-() ]*$/,
-              message: "Please enter a valid mobile number",
+              required: true,
+              message: "Please enter mobile number",
             },
           ]}
         >
@@ -96,27 +126,20 @@ export const ContactFormModal = ({
         </Form.Item>
 
         <Form.Item
-          label="Company"
-          name="business_id"
+          label="Email"
+          name="email"
           rules={[
             {
               required: true,
-              message: "Please select a company",
+              message: "Please enter email address",
+            },
+            {
+              type: "email",
+              message: "Please enter a valid email",
             },
           ]}
         >
-          <Select
-            placeholder="Select a company"
-            showSearch
-            filterOption={(input, option) =>
-              (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-            }
-            options={[
-              // This will be populated with actual companies
-              { value: "1", label: "Company 1" },
-              { value: "2", label: "Company 2" },
-            ]}
-          />
+          <Input placeholder="contact@example.com" />
         </Form.Item>
       </Form>
     </Modal>

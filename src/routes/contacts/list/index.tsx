@@ -33,6 +33,7 @@ export const ContactListPage = () => {
   });
 
   const { tableProps, searchFormProps, setFilters } = useTable({
+    resource: "contact",
     syncWithLocation: true,
     pagination: {
       pageSize: 12,
@@ -51,7 +52,7 @@ export const ContactListPage = () => {
       cancelText: "Cancel",
       onOk() {
         deleteContact({
-          resource: "contacts",
+          resource: "contact",
           id,
         });
       },

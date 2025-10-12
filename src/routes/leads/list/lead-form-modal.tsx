@@ -27,7 +27,7 @@ type LeadFormModalProps = {
 };
 
 const StageEnum = [
-  { value: "Raw", label: "Raw (Unqualified)" },
+  { value: "Raw (Unqualified)", label: "Raw (Unqualified)" },
   { value: "New", label: "New" },
   { value: "Discussion", label: "Discussion" },
   { value: "Demo", label: "Demo" },

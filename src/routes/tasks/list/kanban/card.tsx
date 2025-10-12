@@ -36,6 +36,7 @@ type ProjectCardProps = {
     name: string;
     avatarUrl?: User["avatarUrl"];
   }[];
+  onCardClick?: () => void;
 };
 
 export const ProjectCard = ({
@@ -43,6 +44,7 @@ export const ProjectCard = ({
   title,
   dueDate,
   users,
+  onCardClick,
 }: ProjectCardProps) => {
   const { token } = theme.useToken();
   const { edit } = useNavigation();
@@ -106,7 +108,11 @@ export const ProjectCard = ({
         size="small"
         title={<Text ellipsis={{ tooltip: title }}>{title}</Text>}
         onClick={() => {
-          edit("tasks", id, "replace");
+          if (onCardClick) {
+            onCardClick();
+          } else {
+            edit("tasks", id, "replace");
+          }
         }}
         extra={
           <Dropdown
@@ -243,6 +249,7 @@ export const ProjectCardMemo = memo(ProjectCard, (prev, next) => {
     prev.title === next.title &&
     prev.dueDate === next.dueDate &&
     prev.users?.length === next.users?.length &&
-    prev.updatedAt === next.updatedAt
+    prev.updatedAt === next.updatedAt &&
+    prev.onCardClick === next.onCardClick
   );
 });
