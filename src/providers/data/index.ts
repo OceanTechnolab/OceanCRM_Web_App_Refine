@@ -8,9 +8,16 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:80
 export const API_URL = `${API_BASE_URL}/v1`;
 
 /**
- * Get CSRF token from cookie
+ * Get CSRF token from cookie or localStorage
  */
 const getCsrfToken = (): string | null => {
+  // First try to get from localStorage (set after login for cross-origin scenarios)
+  const storedToken = localStorage.getItem('csrf_access_token');
+  if (storedToken) {
+    return storedToken;
+  }
+
+  // Fallback to reading from cookies (works in same-origin scenarios)
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -44,6 +51,12 @@ axiosInstance.interceptors.request.use((config) => {
 
 // Add response interceptor to transform paginated responses
 axiosInstance.interceptors.response.use((response) => {
+  // Store CSRF token from response header if present (from refresh endpoint)
+  const csrfToken = response.headers['x-csrf-token'];
+  if (csrfToken) {
+    localStorage.setItem('csrf_access_token', csrfToken);
+  }
+
   // If response has 'items' field (paginated response), transform it
   if (response.data && response.data.items && Array.isArray(response.data.items)) {
     // Keep the original structure but also add 'data' field for compatibility

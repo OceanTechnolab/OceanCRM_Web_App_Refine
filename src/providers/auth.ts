@@ -11,9 +11,23 @@ export const authCredentials = {
 };
 
 /**
- * Get CSRF token from cookie
+ * Get the base path for the app (important for GitHub Pages deployment)
+ */
+const getBasePath = (): string => {
+  return import.meta.env.VITE_BASE_PATH || "";
+};
+
+/**
+ * Get CSRF token from cookie or localStorage
  */
 const getCsrfToken = (): string | null => {
+  // First try to get from localStorage (set after login for cross-origin scenarios)
+  const storedToken = localStorage.getItem('csrf_access_token');
+  if (storedToken) {
+    return storedToken;
+  }
+
+  // Fallback to reading from cookies (works in same-origin scenarios)
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -47,13 +61,20 @@ export const authProvider: AuthProvider = {
         };
       }
 
+      // Store CSRF token from response header for cross-origin scenarios
+      // (JavaScript can't reliably read httponly=false cookies in cross-origin contexts)
+      const csrfToken = response.headers.get("X-CSRF-Token");
+      if (csrfToken) {
+        localStorage.setItem("csrf_access_token", csrfToken);
+      }
+
       // Fetch the user's organizations to get org_id
-      const csrfToken = getCsrfToken();
+      const csrfTokenToUse = getCsrfToken();
       const orgResponse = await fetch(`${API_BASE_URL}/v1/org/current`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          ...(csrfToken && { "X-CSRF-Token": csrfToken }),
+          ...(csrfTokenToUse && { "X-CSRF-Token": csrfTokenToUse }),
         },
         credentials: "include",
       });
@@ -67,9 +88,10 @@ export const authProvider: AuthProvider = {
       }
 
       // Cookies are automatically stored by the browser
+      const basePath = getBasePath();
       return {
         success: true,
-        redirectTo: "/",
+        redirectTo: basePath ? `${basePath}/` : "/",
       };
     } catch (e) {
       const error = e as Error;
@@ -98,12 +120,14 @@ export const authProvider: AuthProvider = {
       console.error("Logout error:", error);
     }
 
-    // Clear stored org_id
+    // Clear stored data
     localStorage.removeItem("org_id");
+    localStorage.removeItem("csrf_access_token");
 
+    const basePath = getBasePath();
     return {
       success: true,
-      redirectTo: "/login",
+      redirectTo: basePath ? `${basePath}/login` : "/login",
     };
   },
   onError: async (error) => {
@@ -120,11 +144,14 @@ export const authProvider: AuthProvider = {
     try {
       // Check if user has authentication cookie before making request
       const csrfToken = getCsrfToken();
+      const basePath = getBasePath();
+      const loginPath = basePath ? `${basePath}/login` : "/login";
+
       if (!csrfToken) {
         // No CSRF token means user is not authenticated
         return {
           authenticated: false,
-          redirectTo: "/login",
+          redirectTo: loginPath,
         };
       }
 
@@ -144,12 +171,13 @@ export const authProvider: AuthProvider = {
 
       return {
         authenticated: false,
-        redirectTo: "/login",
+        redirectTo: loginPath,
       };
     } catch (error) {
+      const basePath = getBasePath();
       return {
         authenticated: false,
-        redirectTo: "/login",
+        redirectTo: basePath ? `${basePath}/login` : "/login",
       };
     }
   },
