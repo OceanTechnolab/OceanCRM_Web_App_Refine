@@ -3,7 +3,8 @@ import type { DataProvider } from "@refinedev/core";
 import axios from "axios";
 import { stringify } from "query-string";
 
-export const API_BASE_URL = "http://localhost:8000";
+// Use environment variable for API URL, fallback to localhost for development
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 export const API_URL = `${API_BASE_URL}/v1`;
 
 /**

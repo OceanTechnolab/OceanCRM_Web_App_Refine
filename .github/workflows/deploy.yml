@@ -35,6 +35,7 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /OceanCRM_Web_App_Refine
+          VITE_API_URL: https://crmapi-latest.onrender.com
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
