@@ -34,7 +34,7 @@ import "@refinedev/antd/dist/reset.css";
 const App = () => {
   // Use base path only for GitHub Pages builds
   const basename = import.meta.env.VITE_BASE_PATH || "";
-  
+
   return (
     <BrowserRouter basename={basename}>
       <ConfigProvider theme={RefineThemes.Blue}>
@@ -51,7 +51,7 @@ const App = () => {
                 syncWithLocation: true,
                 warnWhenUnsavedChanges: true,
                 liveMode: "auto",
-                projectId: "jRIAJx-Tr8X4H-k3Snu1"
+                projectId: "jRIAJx-Tr8X4H-k3Snu1",
               }}
             >
               <Routes>
@@ -81,15 +81,18 @@ const App = () => {
                     <Route path="edit/:id" element={<TasksEditPage />} />
                   </Route>
 
-                  <Route path="/companies">
-                    <Route index element={<CompanyListPage />} />
-                    <Route path="new" element={<CompanyCreatePage />} />
-                    <Route path="edit/:id" element={<CompanyEditPage />} />
-                  </Route>
+                  {/* Companies and Contacts pages are temporarily hidden */}
+                  {/*
+                      <Route path="/companies">
+                        <Route index element={<CompanyListPage />} />
+                        <Route path="new" element={<CompanyCreatePage />} />
+                        <Route path="edit/:id" element={<CompanyEditPage />} />
+                      </Route>
 
-                  <Route path="/contacts">
-                    <Route index element={<ContactListPage />} />
-                  </Route>
+                      <Route path="/contacts">
+                        <Route index element={<ContactListPage />} />
+                      </Route>
+                      */}
 
                   <Route path="/leads">
                     <Route index element={<LeadListPage />} />
