@@ -73,12 +73,13 @@ export const authProvider: AuthProvider = {
       }
 
       // Fetch the user's organizations to get org_id
-      const csrfTokenToUse = getCsrfToken();
+      const csrfToken = getCsrfToken();
+
       const orgResponse = await fetch(`${API_BASE_URL}/v1/org/current`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          ...(csrfTokenToUse && { "X-CSRF-Token": csrfTokenToUse }),
+          ...(csrfToken && { "X-CSRF-Token": csrfToken }),
         },
         credentials: "include",
       });
@@ -93,9 +94,11 @@ export const authProvider: AuthProvider = {
 
       // Cookies are automatically stored by the browser
       const basePath = getBasePath();
+      const redirectPath = basePath ? `${basePath}/` : "/";
+
       return {
         success: true,
-        redirectTo: basePath ? `${basePath}/` : "/",
+        redirectTo: redirectPath,
       };
     } catch (e) {
       const error = e as Error;
@@ -149,33 +152,45 @@ export const authProvider: AuthProvider = {
       const basePath = getBasePath();
       const loginPath = basePath ? `${basePath}/login` : "/login";
 
+      // Check if we're already on the login page - if so, don't make unnecessary requests
+      const currentPath = window.location.pathname;
+      const isOnLoginPage = currentPath === loginPath || currentPath.endsWith('/login');
+
       // Try to get CSRF token from localStorage or cookies
       const csrfToken = getCsrfToken();
+
+      // If no CSRF token and we're not on login page, we're not authenticated
+      if (!csrfToken) {
+        if (!isOnLoginPage) {
+          // Clear any stale data
+          localStorage.removeItem('org_id');
+        }
+        return {
+          authenticated: false,
+          redirectTo: loginPath,
+        };
+      }
+
+      // If we're on the login page with a token, we might be authenticated
+      // Make a quick check
+      if (isOnLoginPage) {
+        return {
+          authenticated: false,
+          redirectTo: loginPath,
+        };
+      }
 
       // Make a request to check if user is authenticated
       // The cookies will be sent automatically with credentials: "include"
       const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
         method: "GET",
         credentials: "include",
-        headers: csrfToken ? {
+        headers: {
           "X-CSRF-Token": csrfToken,
-        } : {},
+        },
       });
 
       if (response.ok) {
-        // If we successfully got the user but don't have a CSRF token in localStorage,
-        // try to extract it from the cookie and store it
-        if (!csrfToken) {
-          const cookies = document.cookie.split(';');
-          for (const cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'csrf_access_token' && value) {
-              localStorage.setItem('csrf_access_token', value);
-              break;
-            }
-          }
-        }
-
         return {
           authenticated: true,
         };
@@ -192,6 +207,7 @@ export const authProvider: AuthProvider = {
         redirectTo: loginPath,
       };
     } catch (error) {
+      console.error("[AUTH CHECK] Exception:", error);
       const basePath = getBasePath();
       return {
         authenticated: false,
