@@ -200,46 +200,38 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // We have a CSRF token (or placeholder), verify with the API
-      // Make a request to check if user is authenticated
-      // The cookies will be sent automatically with credentials: "include"
-      console.log("[CHECK] Verifying with API /v1/user/logged...");
+      // We have a CSRF token, consider user authenticated optimistically
+      // This allows immediate UI rendering without waiting for API
+      console.log("[CHECK] ✅ CSRF token present, considering authenticated (optimistic)");
 
-      // Only send X-CSRF-Token header if we have the actual token value
-      const headers: HeadersInit = {};
-      if (csrfToken && csrfToken !== 'CROSS_ORIGIN_COOKIE') {
-        headers["X-CSRF-Token"] = csrfToken;
-        console.log("[CHECK] Using actual CSRF token in header");
-      } else {
-        console.log("[CHECK] Using cookies only (no CSRF header - cross-origin mode)");
-      }
+      // Verify with API in background (non-blocking)
+      // This will handle expired sessions gracefully via onError
+      setTimeout(async () => {
+        try {
+          const headers: HeadersInit = {};
+          if (csrfToken && csrfToken !== 'CROSS_ORIGIN_COOKIE') {
+            headers["X-CSRF-Token"] = csrfToken;
+          }
 
-      const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-        method: "GET",
-        credentials: "include",
-        headers,
-      });
+          const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
+            method: "GET",
+            credentials: "include",
+            headers,
+          });
 
-      console.log("[CHECK] API response status:", response.status);
+          if (response.status === 401) {
+            console.log("[CHECK_BACKGROUND] ❌ Session expired, clearing tokens");
+            localStorage.removeItem('csrf_access_token');
+            localStorage.removeItem('org_id');
+            window.location.href = loginPath;
+          }
+        } catch (error) {
+          console.error("[CHECK_BACKGROUND] Error verifying session:", error);
+        }
+      }, 0);
 
-      if (response.ok) {
-        console.log("[CHECK] ✅ User is authenticated");
-        return {
-          authenticated: true,
-        };
-      }
-
-      // If response is 401, clear any stored tokens
-      if (response.status === 401) {
-        console.log("[CHECK] ❌ 401 Unauthorized - clearing tokens");
-        localStorage.removeItem('csrf_access_token');
-        localStorage.removeItem('org_id');
-      }
-
-      console.log("[CHECK] ❌ Not authenticated, redirecting to login");
       return {
-        authenticated: false,
-        redirectTo: loginPath,
+        authenticated: true,
       };
     } catch (error) {
       console.error("[CHECK] ❌ Exception:", error);
