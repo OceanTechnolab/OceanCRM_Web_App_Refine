@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useGetIdentity } from "@refinedev/core";
 
-import { CloseOutlined } from "@ant-design/icons";
-import { Button, Card, Drawer, Form, Input, Spin, message } from "antd";
+import { CloseOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
 
 import { API_BASE_URL } from "@/providers/data";
 import { getNameInitials } from "@/utilities";
@@ -10,9 +10,9 @@ import { getNameInitials } from "@/utilities";
 import { CustomAvatar } from "../../custom-avatar";
 import { Text } from "../../text";
 
-// Default avatar image - can be replaced with your own default image URL
+// Better default avatar - using a professional style
 const DEFAULT_AVATAR =
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Default";
+  "https://api.dicebear.com/7.x/initials/svg?seed=Default&backgroundColor=1677ff";
 
 type Props = {
   opened: boolean;
@@ -187,14 +187,13 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
         }}
       >
         <Card>
-          <CustomAvatar
-            shape="square"
-            src={DEFAULT_AVATAR}
-            name={getNameInitials(userData?.name || "")}
+          <Avatar
+            size={96}
+            icon={<UserOutlined />}
             style={{
-              width: 96,
-              height: 96,
+              backgroundColor: "#1677ff",
               marginBottom: "24px",
+              fontSize: "48px",
             }}
           />
           <Form form={form} layout="vertical" onFinish={handleSave}>
