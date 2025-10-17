@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 import { DollarOutlined } from "@ant-design/icons";
-import { Area, type AreaConfig } from "@ant-design/plots";
+import { Area, Datum, type AreaConfig } from "@ant-design/plots";
 import { Card } from "antd";
 
 import { Text } from "@/components";
@@ -27,48 +27,57 @@ export const DashboardDealsChart = () => {
   }, [data?.data]);
 
   const config: AreaConfig = {
-    isStack: false,
     data: dealData,
     xField: "timeText",
     yField: "value",
     seriesField: "state",
-    animation: true,
-    startOnZero: false,
-    smooth: true,
+
     legend: {
+      position: "top-left",
       offsetY: -6,
     },
-    yAxis: {
-      tickCount: 4,
-      label: {
-        formatter: (v) => {
-          return `$${Number(v) / 1000}k`;
+
+    axis: {
+      y: {
+        tickCount: 4,
+        label: {
+          formatter: (v: number) => `$${v / 1000}k`,
         },
       },
     },
+
     tooltip: {
-      formatter: (data) => {
-        return {
-          name: data.state,
-          value: `$${Number(data.value) / 1000}k`,
-        };
-      },
+      shared: true,
+      formatter: (datum: Datum) => ({
+        name: datum.state,
+        value: `$${datum.value / 1000}k`,
+      }),
     },
-    areaStyle: (datum) => {
-      const won = "l(270) 0:#ffffff 0.5:#b7eb8f 1:#52c41a";
-      const lost = "l(270) 0:#ffffff 0.5:#f3b7c2 1:#ff4d4f";
-      return { fill: datum.state === "Won" ? won : lost };
+
+    colorField: ({ state }: { state: string }) =>
+      (state === "Won" ? "#52C41A" : "#F5222D"),
+
+    line: {
+      style: ({ state }: { state: string }) => ({
+        stroke: state === "Won" ? "#52C41A" : "#F5222D",
+        lineWidth: 1.5,
+      }),
     },
-    color: (datum) => {
-      return datum.state === "Won" ? "#52C41A" : "#F5222D";
+
+    // If your version supports a nested `area` or `series` config, it might go here:
+    area: {
+      // e.g. shape: "smooth",
+      // style: ({ state }: { state: string }) => ({ fill: ... }),
     },
   };
 
   return (
     <Card
       style={{ height: "100%" }}
-      headStyle={{ padding: "8px 16px" }}
-      bodyStyle={{ padding: "24px 24px 0px 24px" }}
+      styles={{
+        header: { padding: "8px 16px" },
+        body: { padding: "24px 24px 0px 24px" }
+      }}
       title={
         <div
           style={{
