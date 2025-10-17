@@ -22,39 +22,51 @@ export const DashboardTotalCountCard = ({
   const { primaryColor, secondaryColor, icon, title } = variants[resource];
 
   const config: AreaConfig = {
-    appendPadding: [1, 0, 0, 0],
-    padding: 0,
-    syncViewPadding: true,
     data: variants[resource].data,
+    xField: 'index',
+    yField: 'value',
     autoFit: true,
     tooltip: false,
-    animation: false,
-    xField: "index",
-    yField: "value",
-    xAxis: false,
-    yAxis: {
-      tickCount: 12,
-      label: {
-        style: {
-          fill: "transparent",
-        },
-      },
-      grid: {
+    axis: {
+      x: {
         line: {
           style: {
-            stroke: "transparent",
+            lineWidth: 0,
+          },
+        },
+        tickLine: {
+          style: {
+            lineWidth: 0,
+          },
+        },
+      },
+      y: {
+        tickCount: 12,
+        label: {
+          style: {
+            fill: 'transparent',
+          },
+        },
+        grid: {
+          line: {
+            style: {
+              stroke: 'transparent',
+            },
           },
         },
       },
     },
-    smooth: true,
-    areaStyle: () => {
-      return {
-        fill: `l(270) 0:#fff 0.2:${secondaryColor} 1:${primaryColor}`,
-      };
-    },
     line: {
       color: primaryColor,
+      style: {
+        lineWidth: 2,
+      },
+    },
+    area: {
+      style: {
+        fill: `l(270) 0:#fff 0.2:${secondaryColor} 1:${primaryColor}`,
+      },
+      shape: 'smooth',
     },
   };
 
