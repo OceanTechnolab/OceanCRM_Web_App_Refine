@@ -34,13 +34,12 @@ import "@refinedev/antd/dist/reset.css";
 const App = () => {
   // Use base path only for GitHub Pages builds
   const basename = import.meta.env.VITE_BASE_PATH || "";
+  
+  // Disable devtools in production or when not explicitly enabled
+  const isDevtoolsEnabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEVTOOLS !== "false";
 
-  return (
-    <BrowserRouter basename={basename}>
-      <ConfigProvider theme={RefineThemes.Blue}>
-        <AntdApp>
-          <DevtoolsProvider>
-            <Refine
+  const refineContent = (
+    <Refine
               routerProvider={routerProvider}
               dataProvider={dataProvider}
               liveProvider={liveProvider}
@@ -63,7 +62,7 @@ const App = () => {
                       key="authenticated-root"
                       fallback={<CatchAllNavigate to="/login" />}
                     >
-                      <CatchAllNavigate to="/app" />
+                      <CatchAllNavigate to="/app/dashboard" />
                     </Authenticated>
                   }
                 />
@@ -81,7 +80,7 @@ const App = () => {
                     </Authenticated>
                   }
                 >
-                  <Route index element={<DashboardPage />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
 
                   <Route
                     path="tasks"
@@ -131,8 +130,20 @@ const App = () => {
               <UnsavedChangesNotifier />
               <DocumentTitleHandler />
             </Refine>
-            <DevtoolsPanel />
-          </DevtoolsProvider>
+  );
+
+  return (
+    <BrowserRouter basename={basename}>
+      <ConfigProvider theme={RefineThemes.Blue}>
+        <AntdApp>
+          {isDevtoolsEnabled ? (
+            <DevtoolsProvider>
+              {refineContent}
+              <DevtoolsPanel />
+            </DevtoolsProvider>
+          ) : (
+            refineContent
+          )}
         </AntdApp>
       </ConfigProvider>
     </BrowserRouter>

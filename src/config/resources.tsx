@@ -11,7 +11,7 @@ import {
 export const resources: IResourceItem[] = [
   {
     name: "dashboard",
-    list: "/app",
+    list: "/app/dashboard",
     meta: {
       label: "Dashboard",
       icon: <DashboardOutlined />,

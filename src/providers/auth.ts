@@ -10,27 +10,6 @@ export const authCredentials = {
   password: "",
 };
 
-/**
- * Get CSRF token from cookie or localStorage
- */
-const getCsrfToken = (): string | null => {
-  // First try to get from localStorage (set after login for cross-origin scenarios)
-  const storedToken = localStorage.getItem("csrf_access_token");
-  if (storedToken) {
-    return storedToken;
-  }
-
-  // Fallback to reading from cookies (works in same-origin scenarios)
-  const cookies = document.cookie.split(";");
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split("=");
-    if (name === "csrf_access_token") {
-      return value;
-    }
-  }
-  return null;
-};
-
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
     try {
@@ -54,75 +33,17 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // After successful login, try to read CSRF token from cookie and store in localStorage
-      // This helps with cross-origin scenarios where JavaScript might not be able to read cookies
-      console.log("[LOGIN] All cookies:", document.cookie || "(empty)");
-      const cookies = document.cookie.split(";");
-      let csrfTokenFound = false;
-      for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split("=");
-        if (name === "csrf_access_token" && value) {
-          console.log(
-            "[LOGIN] ✅ Found CSRF token in cookie, storing in localStorage",
-          );
-          localStorage.setItem("csrf_access_token", value);
-          csrfTokenFound = true;
-          break;
-        }
-      }
-
-      if (!csrfTokenFound) {
-        console.warn(
-          "[LOGIN] ⚠️ CSRF token NOT readable in JavaScript (cross-origin issue)",
-        );
-        console.log(
-          "[LOGIN] But the browser HAS the cookie and will send it automatically",
-        );
-        console.log("[LOGIN] Making test request to verify cookies work...");
-
-        // The cookies exist (login succeeded) but JS can't read them
-        // Make a test request - browser will send cookies automatically
-        const testResponse = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-          method: "GET",
-          credentials: "include",
-          // No X-CSRF-Token header - let's see if the API sends it without it
-        });
-
-        console.log("[LOGIN] Test request status:", testResponse.status);
-
-        if (testResponse.ok) {
-          console.log(
-            "[LOGIN] ✅ Cookies are working! Storing placeholder in localStorage",
-          );
-          // Store a placeholder so check() knows cookies exist
-          localStorage.setItem("csrf_access_token", "CROSS_ORIGIN_COOKIE");
-        } else {
-          console.error("[LOGIN] ❌ Test request failed:", testResponse.status);
-        }
-      }
-
       // Fetch the user's organizations to get org_id
-      const csrfToken = getCsrfToken();
-      console.log("[LOGIN] CSRF token for org request:", csrfToken);
-
       const orgResponse = await fetch(`${API_BASE_URL}/v1/org/current`, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          // Browser will send cookies automatically, don't send X-CSRF-Token if we have placeholder
-        },
         credentials: "include",
       });
 
-      console.log("[LOGIN] Org response status:", orgResponse.status);
-
       if (orgResponse.ok) {
         const orgs = await orgResponse.json();
-        console.log("[LOGIN] Organizations received:", orgs);
         if (orgs && orgs.length > 0) {
           // Store the first org_id in localStorage
           localStorage.setItem("org_id", orgs[0].id);
-          console.log("[LOGIN] Org ID stored:", orgs[0].id);
         }
       }
 
@@ -131,14 +52,6 @@ export const authProvider: AuthProvider = {
       const redirectPath = "/";
 
       console.log("[LOGIN] ✅ Login successful, redirecting to:", redirectPath);
-      console.log(
-        "[LOGIN] localStorage csrf_access_token:",
-        localStorage.getItem("csrf_access_token"),
-      );
-      console.log(
-        "[LOGIN] localStorage org_id:",
-        localStorage.getItem("org_id"),
-      );
 
       return {
         success: true,
@@ -158,15 +71,9 @@ export const authProvider: AuthProvider = {
   },
   logout: async () => {
     try {
-      const csrfToken = getCsrfToken();
       await fetch(`${API_BASE_URL}/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
-        headers: csrfToken
-          ? {
-              "X-CSRF-Token": csrfToken,
-            }
-          : {},
       });
     } catch (error) {
       // Continue with logout even if API call fails
@@ -175,9 +82,7 @@ export const authProvider: AuthProvider = {
 
     // Clear stored data
     localStorage.removeItem("org_id");
-    localStorage.removeItem("csrf_access_token");
 
-    // Use "/login" because Vite's base config already handles the base path
     return {
       success: true,
       redirectTo: "/login",
@@ -190,7 +95,6 @@ export const authProvider: AuthProvider = {
 
       // Clear all auth data immediately
       localStorage.removeItem("org_id");
-      localStorage.removeItem("csrf_access_token");
 
       return {
         logout: true,
@@ -199,29 +103,45 @@ export const authProvider: AuthProvider = {
       };
     }
 
+    // Handle 422 Unprocessable Content with missing token message
+    if (error.statusCode === 422 || error.status === 422) {
+      const errorMessage = error.message || error.detail || "";
+      
+      if (errorMessage.includes("Missing token in request")) {
+        console.log("[AUTH] 422 Missing token - clearing session and logging out");
+
+        // Clear all auth data immediately
+        localStorage.removeItem("org_id");
+
+        return {
+          logout: true,
+          redirectTo: "/login",
+          error: {
+            ...error,
+            message: "Your session has expired. Please login again.",
+            name: "Session Expired"
+          },
+        };
+      }
+    }
+
     return { error };
   },
   check: async () => {
     try {
-      // NO API CALLS HERE - Only check local storage/cookies
-      // Any 401 errors will be caught by onError() which will trigger logout
-
-      const loginPath = "/login";
-
-      // Try to get CSRF token from localStorage or cookies
-      const csrfToken = getCsrfToken();
-
-      // If no CSRF token, user is not authenticated
-      if (!csrfToken) {
-        localStorage.removeItem("org_id");
+      // For same-origin requests, we can simply check if org_id exists
+      // The actual authentication will be verified by the server via cookies
+      const orgId = localStorage.getItem("org_id");
+      
+      if (!orgId) {
         return {
           authenticated: false,
-          redirectTo: loginPath,
+          redirectTo: "/login",
         };
       }
 
-      // CSRF token exists = user is authenticated
-      // If session expired, onError will catch 401 and logout automatically
+      // User appears to be authenticated
+      // If session expired, onError will catch 401/422 and logout automatically
       return {
         authenticated: true,
       };
@@ -234,26 +154,24 @@ export const authProvider: AuthProvider = {
   },
   getIdentity: async () => {
     try {
-      // Check if user has authentication cookie before making request
-      const csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        // No CSRF token means user is not authenticated
-        return null;
-      }
-
-      // Only send X-CSRF-Token header if we have the actual token value
-      const headers: HeadersInit = {};
-      if (csrfToken && csrfToken !== "CROSS_ORIGIN_COOKIE") {
-        headers["X-CSRF-Token"] = csrfToken;
-      }
-
+      // For same-origin requests, simply make the request with credentials
       const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
         method: "GET",
         credentials: "include",
-        headers,
       });
 
       if (!response.ok) {
+        // Handle 422 specifically to trigger logout via onError
+        if (response.status === 422) {
+          const errorData = await response.json();
+          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
+            const error = new Error("Missing token in request.") as any;
+            error.status = 422;
+            error.statusCode = 422;
+            error.detail = "Missing token in request.";
+            throw error;
+          }
+        }
         return null;
       }
 

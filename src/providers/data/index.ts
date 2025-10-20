@@ -7,39 +7,13 @@ import { stringify } from "query-string";
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 export const API_URL = `${API_BASE_URL}/v1`;
 
-/**
- * Get CSRF token from cookie or localStorage
- */
-const getCsrfToken = (): string | null => {
-  // First try to get from localStorage (set after login for cross-origin scenarios)
-  const storedToken = localStorage.getItem('csrf_access_token');
-  if (storedToken) {
-    return storedToken;
-  }
-
-  // Fallback to reading from cookies (works in same-origin scenarios)
-  const cookies = document.cookie.split(';');
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'csrf_access_token') {
-      return value;
-    }
-  }
-  return null;
-};
-
 // Create axios instance with credentials included for cookie-based auth
 const axiosInstance = axios.create({
   withCredentials: true, // Important: include cookies for JWT auth
 });
 
-// Add request interceptor to include CSRF token in all requests
+// Add request interceptor to include org-id header
 axiosInstance.interceptors.request.use((config) => {
-  const csrfToken = getCsrfToken();
-  if (csrfToken) {
-    config.headers['X-CSRF-Token'] = csrfToken;
-  }
-
   // Add x-org-id header from localStorage
   const orgId = localStorage.getItem('org_id');
   if (orgId) {
@@ -49,21 +23,51 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor to transform paginated responses
-axiosInstance.interceptors.response.use((response) => {
-  // Store CSRF token from response header if present (from refresh endpoint)
-  const csrfToken = response.headers['x-csrf-token'];
-  if (csrfToken) {
-    localStorage.setItem('csrf_access_token', csrfToken);
-  }
+// Add response interceptor to transform paginated responses and handle auth errors
+axiosInstance.interceptors.response.use(
+  (response) => {
+    // If response has 'items' field (paginated response), transform it
+    if (response.data && response.data.items && Array.isArray(response.data.items)) {
+      // Keep the original structure but also add 'data' field for compatibility
+      response.data.data = response.data.items;
+    }
+    return response;
+  },
+  (error) => {
+    // Handle authentication errors
+    if (error.response?.status === 422) {
+      const errorDetail = error.response?.data?.detail || "";
+      
+      if (errorDetail.includes("Missing token in request")) {
+        // Create a standardized error object that matches what the auth provider expects
+        const authError = {
+          status: 422,
+          statusCode: 422,
+          message: "Missing token in request.",
+          detail: "Missing token in request.",
+          name: "AuthenticationError"
+        };
+        
+        // Reject with the standardized error - this will be caught by Refine's error handling
+        return Promise.reject(authError);
+      }
+    }
 
-  // If response has 'items' field (paginated response), transform it
-  if (response.data && response.data.items && Array.isArray(response.data.items)) {
-    // Keep the original structure but also add 'data' field for compatibility
-    response.data.data = response.data.items;
+    // Handle other 401 errors as before
+    if (error.response?.status === 401) {
+      const authError = {
+        status: 401,
+        statusCode: 401,
+        message: error.response?.data?.detail || "Unauthorized",
+        name: "AuthenticationError"
+      };
+      return Promise.reject(authError);
+    }
+
+    // For all other errors, pass through as-is
+    return Promise.reject(error);
   }
-  return response;
-});
+);
 
 // Get the base simple-rest data provider
 const simpleRestProvider = dataProviderSimpleRest(API_URL, axiosInstance);

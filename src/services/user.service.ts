@@ -14,6 +14,16 @@ export const userService = {
         });
 
         if (!response.ok) {
+            if (response.status === 422) {
+                const errorData = await response.json();
+                if (errorData.detail && errorData.detail.includes("Missing token in request")) {
+                    const error = new Error("Missing token in request.") as any;
+                    error.status = 422;
+                    error.statusCode = 422;
+                    error.detail = "Missing token in request.";
+                    throw error;
+                }
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetIdentity } from "@refinedev/core";
+import { useGetIdentity, useLogout } from "@refinedev/core";
 
 import { CloseOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
@@ -28,26 +28,13 @@ type UserData = {
   avatarUrl?: string;
 };
 
-/**
- * Get CSRF token from cookie
- */
-const getCsrfToken = (): string | null => {
-  const cookies = document.cookie.split(";");
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split("=");
-    if (name === "csrf_access_token") {
-      return value;
-    }
-  }
-  return null;
-};
-
 export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const { data: identity } = useGetIdentity<UserData>();
+  const { mutate: logout } = useLogout();
 
   useEffect(() => {
     if (opened && userId) {
@@ -58,18 +45,20 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
-      const csrfToken = getCsrfToken();
       const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
         method: "GET",
         credentials: "include",
-        headers: csrfToken
-          ? {
-              "X-CSRF-Token": csrfToken,
-            }
-          : {},
       });
 
       if (!response.ok) {
+        if (response.status === 422) {
+          const errorData = await response.json();
+          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
+            message.error("Your session has expired. Please login again.");
+            logout();
+            return;
+          }
+        }
         throw new Error("Failed to fetch user data");
       }
 
@@ -99,13 +88,11 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const handleSave = async (values: any) => {
     setIsSaving(true);
     try {
-      const csrfToken = getCsrfToken();
       const response = await fetch(`${API_BASE_URL}/v1/user/${userId}`, {
         method: "PUT",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
         },
         body: JSON.stringify({
           name: values.name,
@@ -115,6 +102,14 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
       });
 
       if (!response.ok) {
+        if (response.status === 422) {
+          const errorData = await response.json();
+          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
+            message.error("Your session has expired. Please login again.");
+            logout();
+            return;
+          }
+        }
         throw new Error("Failed to update user data");
       }
 
