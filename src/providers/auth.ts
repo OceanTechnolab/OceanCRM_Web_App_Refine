@@ -15,16 +15,16 @@ export const authCredentials = {
  */
 const getCsrfToken = (): string | null => {
   // First try to get from localStorage (set after login for cross-origin scenarios)
-  const storedToken = localStorage.getItem('csrf_access_token');
+  const storedToken = localStorage.getItem("csrf_access_token");
   if (storedToken) {
     return storedToken;
   }
 
   // Fallback to reading from cookies (works in same-origin scenarios)
-  const cookies = document.cookie.split(';');
+  const cookies = document.cookie.split(";");
   for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'csrf_access_token') {
+    const [name, value] = cookie.trim().split("=");
+    if (name === "csrf_access_token") {
       return value;
     }
   }
@@ -57,21 +57,27 @@ export const authProvider: AuthProvider = {
       // After successful login, try to read CSRF token from cookie and store in localStorage
       // This helps with cross-origin scenarios where JavaScript might not be able to read cookies
       console.log("[LOGIN] All cookies:", document.cookie || "(empty)");
-      const cookies = document.cookie.split(';');
+      const cookies = document.cookie.split(";");
       let csrfTokenFound = false;
       for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'csrf_access_token' && value) {
-          console.log("[LOGIN] ✅ Found CSRF token in cookie, storing in localStorage");
-          localStorage.setItem('csrf_access_token', value);
+        const [name, value] = cookie.trim().split("=");
+        if (name === "csrf_access_token" && value) {
+          console.log(
+            "[LOGIN] ✅ Found CSRF token in cookie, storing in localStorage",
+          );
+          localStorage.setItem("csrf_access_token", value);
           csrfTokenFound = true;
           break;
         }
       }
 
       if (!csrfTokenFound) {
-        console.warn("[LOGIN] ⚠️ CSRF token NOT readable in JavaScript (cross-origin issue)");
-        console.log("[LOGIN] But the browser HAS the cookie and will send it automatically");
+        console.warn(
+          "[LOGIN] ⚠️ CSRF token NOT readable in JavaScript (cross-origin issue)",
+        );
+        console.log(
+          "[LOGIN] But the browser HAS the cookie and will send it automatically",
+        );
         console.log("[LOGIN] Making test request to verify cookies work...");
 
         // The cookies exist (login succeeded) but JS can't read them
@@ -85,9 +91,11 @@ export const authProvider: AuthProvider = {
         console.log("[LOGIN] Test request status:", testResponse.status);
 
         if (testResponse.ok) {
-          console.log("[LOGIN] ✅ Cookies are working! Storing placeholder in localStorage");
+          console.log(
+            "[LOGIN] ✅ Cookies are working! Storing placeholder in localStorage",
+          );
           // Store a placeholder so check() knows cookies exist
-          localStorage.setItem('csrf_access_token', 'CROSS_ORIGIN_COOKIE');
+          localStorage.setItem("csrf_access_token", "CROSS_ORIGIN_COOKIE");
         } else {
           console.error("[LOGIN] ❌ Test request failed:", testResponse.status);
         }
@@ -123,8 +131,14 @@ export const authProvider: AuthProvider = {
       const redirectPath = "/";
 
       console.log("[LOGIN] ✅ Login successful, redirecting to:", redirectPath);
-      console.log("[LOGIN] localStorage csrf_access_token:", localStorage.getItem('csrf_access_token'));
-      console.log("[LOGIN] localStorage org_id:", localStorage.getItem('org_id'));
+      console.log(
+        "[LOGIN] localStorage csrf_access_token:",
+        localStorage.getItem("csrf_access_token"),
+      );
+      console.log(
+        "[LOGIN] localStorage org_id:",
+        localStorage.getItem("org_id"),
+      );
 
       return {
         success: true,
@@ -148,9 +162,11 @@ export const authProvider: AuthProvider = {
       await fetch(`${API_BASE_URL}/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
-        headers: csrfToken ? {
-          "X-CSRF-Token": csrfToken,
-        } : {},
+        headers: csrfToken
+          ? {
+              "X-CSRF-Token": csrfToken,
+            }
+          : {},
       });
     } catch (error) {
       // Continue with logout even if API call fails
@@ -182,18 +198,13 @@ export const authProvider: AuthProvider = {
       // Use "/login" because Vite's base config already handles the base path
       const loginPath = "/login";
 
-      console.log("[CHECK] Starting auth check...");
-      console.log("[CHECK] Current path:", window.location.pathname);
-
       // Try to get CSRF token from localStorage or cookies
       const csrfToken = getCsrfToken();
-      console.log("[CHECK] CSRF token:", csrfToken ? (csrfToken === 'CROSS_ORIGIN_COOKIE' ? "PLACEHOLDER" : "ACTUAL") : "MISSING");
 
       // If no CSRF token (not even placeholder), we're not authenticated
       if (!csrfToken) {
-        console.log("[CHECK] ❌ No CSRF token, not authenticated");
         // Clear any stale data
-        localStorage.removeItem('org_id');
+        localStorage.removeItem("org_id");
         return {
           authenticated: false,
           redirectTo: loginPath,
@@ -202,39 +213,12 @@ export const authProvider: AuthProvider = {
 
       // We have a CSRF token, consider user authenticated optimistically
       // This allows immediate UI rendering without waiting for API
-      console.log("[CHECK] ✅ CSRF token present, considering authenticated (optimistic)");
-
-      // Verify with API in background (non-blocking)
-      // This will handle expired sessions gracefully via onError
-      setTimeout(async () => {
-        try {
-          const headers: HeadersInit = {};
-          if (csrfToken && csrfToken !== 'CROSS_ORIGIN_COOKIE') {
-            headers["X-CSRF-Token"] = csrfToken;
-          }
-
-          const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-            method: "GET",
-            credentials: "include",
-            headers,
-          });
-
-          if (response.status === 401) {
-            console.log("[CHECK_BACKGROUND] ❌ Session expired, clearing tokens");
-            localStorage.removeItem('csrf_access_token');
-            localStorage.removeItem('org_id');
-            window.location.href = loginPath;
-          }
-        } catch (error) {
-          console.error("[CHECK_BACKGROUND] Error verifying session:", error);
-        }
-      }, 0);
+      // Session expiry will be caught by onError on any API call
 
       return {
         authenticated: true,
       };
     } catch (error) {
-      console.error("[CHECK] ❌ Exception:", error);
       return {
         authenticated: false,
         redirectTo: "/login",
@@ -252,7 +236,7 @@ export const authProvider: AuthProvider = {
 
       // Only send X-CSRF-Token header if we have the actual token value
       const headers: HeadersInit = {};
-      if (csrfToken && csrfToken !== 'CROSS_ORIGIN_COOKIE') {
+      if (csrfToken && csrfToken !== "CROSS_ORIGIN_COOKIE") {
         headers["X-CSRF-Token"] = csrfToken;
       }
 

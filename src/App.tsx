@@ -55,7 +55,21 @@ const App = () => {
               }}
             >
               <Routes>
+                {/* Root redirect - authenticated users go to dashboard, unauthenticated to login */}
                 <Route
+                  index
+                  element={
+                    <Authenticated
+                      key="authenticated-root"
+                      fallback={<CatchAllNavigate to="/login" />}
+                    >
+                      <CatchAllNavigate to="/app" />
+                    </Authenticated>
+                  }
+                />
+
+                <Route
+                  path="/app"
                   element={
                     <Authenticated
                       key="authenticated-layout"
@@ -70,7 +84,7 @@ const App = () => {
                   <Route index element={<DashboardPage />} />
 
                   <Route
-                    path="/tasks"
+                    path="tasks"
                     element={
                       <TasksListPage>
                         <Outlet />
@@ -83,18 +97,18 @@ const App = () => {
 
                   {/* Companies and Contacts pages are temporarily hidden */}
                   {/*
-                      <Route path="/companies">
+                      <Route path="companies">
                         <Route index element={<CompanyListPage />} />
                         <Route path="new" element={<CompanyCreatePage />} />
                         <Route path="edit/:id" element={<CompanyEditPage />} />
                       </Route>
 
-                      <Route path="/contacts">
+                      <Route path="contacts">
                         <Route index element={<ContactListPage />} />
                       </Route>
                       */}
 
-                  <Route path="/leads">
+                  <Route path="leads">
                     <Route index element={<LeadListPage />} />
                   </Route>
 

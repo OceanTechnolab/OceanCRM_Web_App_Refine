@@ -11,7 +11,7 @@ import {
 export const resources: IResourceItem[] = [
   {
     name: "dashboard",
-    list: "/",
+    list: "/app",
     meta: {
       label: "Dashboard",
       icon: <DashboardOutlined />,
@@ -20,10 +20,10 @@ export const resources: IResourceItem[] = [
   // Companies and Contacts are temporarily hidden
   // {
   //   name: "companies",
-  //   list: "/companies",
-  //   show: "/companies/:id",
-  //   create: "/companies/new",
-  //   edit: "/companies/edit/:id",
+  //   list: "/app/companies",
+  //   show: "/app/companies/:id",
+  //   create: "/app/companies/new",
+  //   edit: "/app/companies/edit/:id",
   //   meta: {
   //     label: "Companies",
   //     icon: <ShopOutlined />,
@@ -31,9 +31,9 @@ export const resources: IResourceItem[] = [
   // },
   // {
   //   name: "contacts",
-  //   list: "/contacts",
-  //   create: "/contacts/new",
-  //   edit: "/contacts/edit/:id",
+  //   list: "/app/contacts",
+  //   create: "/app/contacts/new",
+  //   edit: "/app/contacts/edit/:id",
   //   meta: {
   //     label: "Contacts",
   //     icon: <TeamOutlined />,
@@ -41,9 +41,9 @@ export const resources: IResourceItem[] = [
   // },
   {
     name: "lead",
-    list: "/leads",
-    create: "/leads/new",
-    edit: "/leads/edit/:id",
+    list: "/app/leads",
+    create: "/app/leads/new",
+    edit: "/app/leads/edit/:id",
     meta: {
       label: "Leads",
       icon: <RocketOutlined />,
@@ -51,9 +51,9 @@ export const resources: IResourceItem[] = [
   },
   {
     name: "tasks",
-    list: "/tasks",
-    create: "/tasks/new",
-    edit: "/tasks/edit/:id",
+    list: "/app/tasks",
+    create: "/app/tasks/new",
+    edit: "/app/tasks/edit/:id",
     meta: {
       label: "Tasks",
       icon: <ProjectOutlined />,
