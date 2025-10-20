@@ -184,9 +184,17 @@ export const authProvider: AuthProvider = {
     };
   },
   onError: async (error) => {
+    // Handle 401 Unauthorized - session expired or invalid
     if (error.statusCode === 401 || error.status === 401) {
+      console.log("[AUTH] 401 Unauthorized - clearing session and logging out");
+
+      // Clear all auth data immediately
+      localStorage.removeItem("org_id");
+      localStorage.removeItem("csrf_access_token");
+
       return {
         logout: true,
+        redirectTo: "/login",
         error,
       };
     }
@@ -195,15 +203,16 @@ export const authProvider: AuthProvider = {
   },
   check: async () => {
     try {
-      // Use "/login" because Vite's base config already handles the base path
+      // NO API CALLS HERE - Only check local storage/cookies
+      // Any 401 errors will be caught by onError() which will trigger logout
+
       const loginPath = "/login";
 
       // Try to get CSRF token from localStorage or cookies
       const csrfToken = getCsrfToken();
 
-      // If no CSRF token (not even placeholder), we're not authenticated
+      // If no CSRF token, user is not authenticated
       if (!csrfToken) {
-        // Clear any stale data
         localStorage.removeItem("org_id");
         return {
           authenticated: false,
@@ -211,10 +220,8 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // We have a CSRF token, consider user authenticated optimistically
-      // This allows immediate UI rendering without waiting for API
-      // Session expiry will be caught by onError on any API call
-
+      // CSRF token exists = user is authenticated
+      // If session expired, onError will catch 401 and logout automatically
       return {
         authenticated: true,
       };
