@@ -4,7 +4,7 @@ import axios from "axios";
 import { stringify } from "query-string";
 
 // Use environment variable for API URL, fallback to localhost for development
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 export const API_URL = `${API_BASE_URL}/v1`;
 
 // Create axios instance with credentials included for cookie-based auth
@@ -37,7 +37,7 @@ axiosInstance.interceptors.response.use(
     // Handle authentication errors
     if (error.response?.status === 422) {
       const errorDetail = error.response?.data?.detail || "";
-      
+
       if (errorDetail.includes("Missing token in request")) {
         // Create a standardized error object that matches what the auth provider expects
         const authError = {
@@ -47,7 +47,7 @@ axiosInstance.interceptors.response.use(
           detail: "Missing token in request.",
           name: "AuthenticationError"
         };
-        
+
         // Reject with the standardized error - this will be caught by Refine's error handling
         return Promise.reject(authError);
       }
