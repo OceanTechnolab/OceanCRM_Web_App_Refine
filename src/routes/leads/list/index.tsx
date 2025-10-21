@@ -1,9 +1,12 @@
 import { DeleteButton, EditButton, List, useTable } from "@refinedev/antd";
-import { Input, Space, Table, Tag } from "antd";
+import { Input, Space, Table, Tag, Button } from "antd";
 import { useState } from "react";
+import { EyeOutlined } from "@ant-design/icons";
 import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
+import { QuickActivityButton } from "@/components/quick-activity-button";
 import { LeadFormModal } from "@/routes/leads/list/lead-form-modal";
+import { LeadDetailModal } from "@/components/lead-detail-modal";
 
 const { Search } = Input;
 
@@ -11,6 +14,9 @@ export const LeadListPage = () => {
   const [search, setSearch] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedLeadData, setSelectedLeadData] = useState<any>(null);
   const [editingLeadId, setEditingLeadId] = useState<string | undefined>();
   const [editingLeadData, setEditingLeadData] = useState<any>(null);
 
@@ -156,6 +162,25 @@ export const LeadListPage = () => {
             dataIndex="actions"
             render={(_, record: any) => (
               <Space>
+                <QuickActivityButton
+                  leadId={record.id}
+                  onSuccess={() => {
+                    // Optionally refresh the table or show a success indicator
+                  }}
+                />
+                <Button
+                  type="default"
+                  icon={<EyeOutlined />}
+                  size="small"
+                  onClick={() => {
+                    console.log("View clicked - record data:", record);
+                    setSelectedLeadId(record.id);
+                    setSelectedLeadData(record);
+                    setIsDetailModalOpen(true);
+                  }}
+                >
+                  View
+                </Button>
                 <EditButton
                   hideText
                   size="small"
@@ -193,6 +218,16 @@ export const LeadListPage = () => {
         }}
         leadId={editingLeadId}
         leadData={editingLeadData}
+      />
+      <LeadDetailModal
+        leadId={selectedLeadId}
+        leadData={selectedLeadData}
+        open={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedLeadId(null);
+          setSelectedLeadData(null);
+        }}
       />
     </>
   );

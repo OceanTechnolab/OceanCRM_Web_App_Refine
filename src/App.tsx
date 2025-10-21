@@ -22,6 +22,7 @@ import {
   ContactListPage,
   DashboardPage,
   LeadListPage,
+  LeadDetailPage,
   LoginPage,
   TasksCreatePage,
   TasksEditPage,
@@ -109,6 +110,7 @@ const App = () => {
 
                   <Route path="leads">
                     <Route index element={<LeadListPage />} />
+                    <Route path="detail/:id" element={<LeadDetailPage />} />
                   </Route>
 
                   <Route path="*" element={<ErrorComponent />} />

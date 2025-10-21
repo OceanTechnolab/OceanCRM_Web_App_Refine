@@ -113,6 +113,34 @@ export const dataProvider: DataProvider = {
     };
   },
 
+  getOne: async ({ resource, id }) => {
+    // For resources without a dedicated getOne endpoint, fetch from list and find the item
+    // This is a workaround for the backend not having GET /v1/lead/{id} endpoint
+    if (resource === "lead") {
+      const url = `${API_URL}/${resource}`;
+      
+      // Fetch with a large page size to increase chances of finding the lead
+      // In production, this should be replaced with a proper backend endpoint
+      const { data } = await axiosInstance.get(
+        `${url}?${stringify({ page: 1, page_size: 1000 }, { skipNull: true })}`
+      );
+
+      const items = data.items || data.data || data;
+      const item = items.find((item: any) => item.id === id);
+
+      if (!item) {
+        throw new Error(`${resource} with id ${id} not found`);
+      }
+
+      return { data: item };
+    }
+
+    // For other resources, use the default behavior
+    const url = `${API_URL}/${resource}/${id}`;
+    const { data } = await axiosInstance.get(url);
+    return { data };
+  },
+
   update: async ({ resource, id, variables }) => {
     const url = `${API_URL}/${resource}/${id}`;
 
