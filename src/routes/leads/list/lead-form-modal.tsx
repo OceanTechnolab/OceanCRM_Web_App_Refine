@@ -56,6 +56,10 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
   const [newSourceName, setNewSourceName] = useState("");
   const [isCreatingSource, setIsCreatingSource] = useState(false);
 
+  const [showNewTagInput, setShowNewTagInput] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+
   // Store business ID for edit mode
   const [businessId, setBusinessId] = useState<string | undefined>();
 
@@ -66,6 +70,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
   const { data: identity } = useGetIdentity<{ id: string }>();
   const { mutate: createProduct } = useCreate();
   const { mutate: createSource } = useCreate();
+  const { mutate: createTag } = useCreate();
 
   const { formProps, modalProps, form } = useModalForm({
     resource: "lead",
@@ -96,6 +101,14 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     resource: "product",
     optionLabel: "name",
     optionValue: "id",
+    pagination: { pageSize: 100 },
+    queryOptions: { enabled: opened },
+  });
+
+  const { selectProps: tagSelectProps, query: tagQuery } = useSelect({
+    resource: "tag",
+    optionLabel: "name",
+    optionValue: "name",
     pagination: { pageSize: 100 },
     queryOptions: { enabled: opened },
   });
@@ -159,6 +172,25 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     );
   };
 
+  const handleCreateTag = () => {
+    if (!newTagName.trim()) return;
+    setIsCreatingTag(true);
+    createTag(
+      { resource: "tag", values: { name: newTagName.trim() } },
+      {
+        onSuccess: (data) => {
+          const currentTags = form.getFieldValue("tags") || [];
+          form.setFieldValue("tags", [...currentTags, data.data.name]);
+          setNewTagName("");
+          setShowNewTagInput(false);
+          setIsCreatingTag(false);
+          tagQuery?.refetch();
+        },
+        onError: () => setIsCreatingTag(false),
+      },
+    );
+  };
+
   // Populate form when editing with grid data
   useEffect(() => {
     if (action === "edit" && leadData && form && opened) {
@@ -177,13 +209,19 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
         // Store business ID for update
         setBusinessId(business?.id);
 
+        // Strip +91 prefix from mobile number for editing
+        const mobileNumber = business?.mobile || "";
+        const displayMobile = mobileNumber.startsWith("+91") 
+          ? mobileNumber.substring(3) 
+          : mobileNumber;
+
         form.setFieldsValue({
           ...otherData,
           business_name: business?.business || "",
           contact_person: business?.name || "",
           title: business?.title || undefined,
           designation: business?.designation || "",
-          mobile: business?.mobile || "",
+          mobile: displayMobile,
           email: business?.email || "",
           website: business?.website || "",
           address: business?.address_line_1 || "",
@@ -207,12 +245,34 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
   };
 
   const handleFinish = (values: any) => {
+    // Validate that at least one of name, email, or mobile is provided
+    if (!values.contact_person && !values.email && !values.mobile) {
+      form.setFields([
+        {
+          name: 'contact_person',
+          errors: ['At least one of Name, Email, or Mobile is required'],
+        },
+        {
+          name: 'email',
+          errors: ['At least one of Name, Email, or Mobile is required'],
+        },
+        {
+          name: 'mobile',
+          errors: ['At least one of Name, Email, or Mobile is required'],
+        },
+      ]);
+      return;
+    }
+
+    // Concatenate +91 with mobile number if provided
+    const mobileNumber = values.mobile ? `+91${values.mobile}` : "";
+
     const businessData: any = {
       business: values.business_name || "",
       name: values.contact_person || "",
       title: values.title || null,
       designation: values.designation || "",
-      mobile: values.mobile || "",
+      mobile: mobileNumber,
       email: values.email || "",
       website: values.website || "",
       address_line_1: values.address || "",
@@ -229,14 +289,14 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     }
 
     const transformedData = {
-      assigned_to: values.assigned_user_id || identity?.id,
+      assigned_to: values.assigned_user_id || identity?.id || null,
       tags: values.tags || [],
       stage: values.stage,
-      source_id: values.source_id,
-      product_id: values.product_id,
-      potential: values.potential,
-      requirements: values.requirements,
-      notes: values.notes,
+      source_id: values.source_id || null,
+      product_id: values.product_id || null,
+      potential: values.potential || 0,
+      requirements: values.requirements || "",
+      notes: values.notes || "",
       business: businessData,
       since: values.since
         ? values.since.toISOString()
@@ -256,13 +316,19 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
       const { business, since, product, source, assigned_user, ...otherData } =
         leadData;
 
+      // Strip +91 prefix from mobile number for editing
+      const mobileNumber = business?.mobile || "";
+      const displayMobile = mobileNumber.startsWith("+91") 
+        ? mobileNumber.substring(3) 
+        : mobileNumber;
+
       form.setFieldsValue({
         ...otherData,
         business_name: business?.business || "",
         contact_person: business?.name || "",
         title: business?.title || undefined,
         designation: business?.designation || "",
-        mobile: business?.mobile || "",
+        mobile: displayMobile,
         email: business?.email || "",
         website: business?.website || "",
         address: business?.address_line_1 || "",
@@ -325,7 +391,6 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Business"
               name="business_name"
-              rules={[{ required: true, message: "Required" }]}
               style={{ marginBottom: 10 }}
             >
               <Input placeholder="" size="small" />
@@ -336,7 +401,6 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 <Form.Item
                   label="Name"
                   name="title"
-                  rules={[{ required: true, message: "" }]}
                   style={{ marginBottom: 10 }}
                 >
                   <Select placeholder="Mr." allowClear size="small">
@@ -345,23 +409,13 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                   </Select>
                 </Form.Item>
               </Col>
-              <Col span={9}>
+              <Col span={18}>
                 <Form.Item
                   label=" "
                   name="contact_person"
-                  rules={[{ required: true, message: "" }]}
                   style={{ marginBottom: 10 }}
                 >
-                  <Input placeholder="First Name" size="small" />
-                </Form.Item>
-              </Col>
-              <Col span={9}>
-                <Form.Item
-                  label=" "
-                  name="last_name"
-                  style={{ marginBottom: 10 }}
-                >
-                  <Input placeholder="Last Name" size="small" />
+                  <Input placeholder="Contact Person Name" size="small" />
                 </Form.Item>
               </Col>
             </Row>
@@ -378,22 +432,20 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               label="Mobile"
               name="mobile"
               rules={[
-                { required: true, message: "Required" },
                 {
-                  pattern: /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/,
-                  message: "Invalid phone number",
+                  pattern: /^[6-9]\d{9}$/,
+                  message: "Enter valid 10-digit Indian mobile number",
                 },
               ]}
               style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" addonBefore="+91" size="small" />
+              <Input placeholder="10-digit mobile number" addonBefore="+91" size="small" />
             </Form.Item>
 
             <Form.Item
               label="Email"
               name="email"
               rules={[
-                { required: true, message: "Required" },
                 { type: "email", message: "Invalid email" },
               ]}
               style={{ marginBottom: 10 }}
@@ -440,37 +492,13 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               </Select>
             </Form.Item>
 
-            <Row gutter={8}>
-              <Col span={12}>
-                <Form.Item
-                  label="City"
-                  name="city"
-                  style={{ marginBottom: 10 }}
-                >
-                  <Input placeholder="" size="small" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="State"
-                  name="state"
-                  style={{ marginBottom: 10 }}
-                >
-                  <Select
-                    placeholder="Select"
-                    allowClear
-                    showSearch
-                    size="small"
-                  >
-                    <Select.Option value="Gujarat">Gujarat</Select.Option>
-                    <Select.Option value="Maharashtra">
-                      Maharashtra
-                    </Select.Option>
-                    <Select.Option value="Karnataka">Karnataka</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
+            <Form.Item
+              label="City"
+              name="city"
+              style={{ marginBottom: 10 }}
+            >
+              <Input placeholder="" size="small" />
+            </Form.Item>
 
             <Form.Item label="GSTIN" name="GSTIN" style={{ marginBottom: 10 }}>
               <Input placeholder="" size="small" />
@@ -505,13 +533,19 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 <Form.Item
                   label="Source"
                   name="source_id"
-                  rules={[{ required: true, message: "Required" }]}
                   style={{ marginBottom: 10 }}
                 >
                   <Select
                     {...sourceSelectProps}
                     placeholder="Select"
                     size="small"
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      String(option?.label ?? "")
+                        .toLowerCase()
+                        .includes(input.toLowerCase())
+                    }
                     popupRender={(menu) => (
                       <>
                         {menu}
@@ -586,13 +620,19 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Product"
               name="product_id"
-              rules={[{ required: true, message: "Required" }]}
               style={{ marginBottom: 10 }}
             >
               <Select
                 {...productSelectProps}
                 placeholder=""
                 size="small"
+                allowClear
+                showSearch
+                filterOption={(input, option) =>
+                  String(option?.label ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
                 popupRender={(menu) => (
                   <>
                     {menu}
@@ -665,7 +705,6 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Assigned to"
               name="assigned_user_id"
-              rules={[{ required: true, message: "Required" }]}
               style={{ marginBottom: 10 }}
             >
               <Select
@@ -674,6 +713,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 showSearch
                 optionFilterProp="label"
                 size="small"
+                allowClear
                 options={users.map((user) => ({
                   label: `${user.name}`,
                   value: user.id,
@@ -696,10 +736,70 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
 
             <Form.Item label="Tags" name="tags" style={{ marginBottom: 10 }}>
               <Select
-                mode="tags"
-                placeholder="Enter Tag"
+                {...tagSelectProps}
+                mode="multiple"
+                placeholder="Select or add tags"
                 style={{ width: "100%" }}
                 size="small"
+                allowClear
+                showSearch
+                filterOption={(input, option) =>
+                  String(option?.label ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                popupRender={(menu) => (
+                  <>
+                    {menu}
+                    <div
+                      style={{
+                        padding: "8px",
+                        borderTop: "1px solid #f0f0f0",
+                      }}
+                    >
+                      {!showNewTagInput ? (
+                        <Button
+                          type="text"
+                          icon={<PlusOutlined />}
+                          onClick={() => setShowNewTagInput(true)}
+                          style={{ width: "100%" }}
+                          size="small"
+                        >
+                          Add new tag
+                        </Button>
+                      ) : (
+                        <Space style={{ width: "100%" }}>
+                          <Input
+                            placeholder="Tag name"
+                            value={newTagName}
+                            onChange={(e) => setNewTagName(e.target.value)}
+                            onPressEnter={handleCreateTag}
+                            style={{ flex: 1 }}
+                            size="small"
+                          />
+                          <Button
+                            type="primary"
+                            onClick={handleCreateTag}
+                            loading={isCreatingTag}
+                            disabled={!newTagName.trim()}
+                            size="small"
+                          >
+                            Add
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setShowNewTagInput(false);
+                              setNewTagName("");
+                            }}
+                            size="small"
+                          >
+                            Cancel
+                          </Button>
+                        </Space>
+                      )}
+                    </div>
+                  </>
+                )}
               />
             </Form.Item>
           </Col>

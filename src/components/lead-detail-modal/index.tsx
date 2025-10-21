@@ -43,6 +43,7 @@ import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
 import { interactionService } from "@/services/interaction.service";
 import { appointmentService } from "@/services/appointment.service";
+import { API_BASE_URL } from "@/providers/data";
 import type { Interaction, InteractionType } from "@/interfaces/interaction";
 import type { Appointment, AppointmentType } from "@/interfaces/appointment";
 
@@ -88,8 +89,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState("overview");
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [interactionsLoading, setInteractionsLoading] = useState(false);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,6 +102,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   // Use passed leadData directly instead of fetching
   const lead = leadData;
   const loading = false; // No loading since we have data from grid
+
+  // Get current user ID from localStorage
+  const currentUserId = localStorage.getItem('user_id') || lead?.assigned_user?.id;
 
   // Fetch interactions when modal opens or leadId changes
   useEffect(() => {
@@ -139,6 +145,41 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
     fetchAppointments();
   }, [leadId, open]);
+
+  // Fetch users when modal opens
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!open) return;
+
+      setUsersLoading(true);
+      try {
+        const orgId = localStorage.getItem('org_id');
+        const response = await fetch(`${API_BASE_URL}/v1/user`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'x-org-id': orgId || '',
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+
+        const data = await response.json();
+        console.log('[USERS] Fetched users:', data);
+        setUsers(data);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        message.error("Failed to load users");
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [open]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -190,14 +231,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const currentUserId = localStorage.getItem('user_id');
-      
       const payload = {
         lead_id: leadId,
         note: values.note,
         appointment_type: values.appointment_type,
         scheduled_at: values.scheduled_at.toISOString(),
-        assigned_to: values.assigned_to || currentUserId || lead.assigned_user?.id,
+        assigned_to: values.assigned_to,
       };
 
       const newAppointment = await appointmentService.createAppointment(payload);
@@ -620,7 +659,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               onFinish={handleAddAppointment}
               initialValues={{
                 scheduled_at: dayjs().add(1, 'day').hour(10).minute(0),
-                assigned_to: lead?.assigned_user?.id,
+                assigned_to: currentUserId,
               }}
             >
               <Form.Item
@@ -663,11 +702,29 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 label="Assign To"
                 rules={[{ required: true, message: "Please select assignee" }]}
               >
-                <Input
+                <Select
                   size="large"
-                  placeholder="User ID"
-                  disabled={!!lead?.assigned_user?.id}
-                  addonBefore={<UserOutlined />}
+                  placeholder="Please select sales owner user"
+                  loading={usersLoading}
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={users.map(user => ({
+                    value: user.id,
+                    label: user.name,
+                    user: user,
+                  }))}
+                  optionRender={(option) => (
+                    <Space>
+                      <CustomAvatar
+                        name={option.data.user.name}
+                        size="small"
+                      />
+                      <span>{option.data.user.name}</span>
+                    </Space>
+                  )}
                 />
               </Form.Item>
 
