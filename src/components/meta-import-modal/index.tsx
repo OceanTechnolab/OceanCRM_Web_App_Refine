@@ -61,6 +61,8 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   const { mutate: createAccount } = useCreate();
 
@@ -81,19 +83,51 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         if (response.authResponse) {
           const token = response.authResponse.accessToken;
           setUserToken(token);
-          fetchPages(token);
+          // Fetch user info to display email
+          fetchUserInfo(token);
         } else {
-          setError("Facebook login failed. Please try again.");
+          setError("Facebook login failed or was cancelled. Please try again.");
           setLoading(false);
         }
       },
       {
-        scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,leads_retrieval",
+        // Using basic email permission that's ready for testing
+        // This will verify the setup works before requesting advanced permissions
+        scope: "email",
       }
     );
   };
 
-  // Step 1: Fetch Pages
+  // Fetch User Info (email and name)
+  const fetchUserInfo = async (token: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v24.0/me?fields=id,name,email&access_token=${token}`
+      );
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      if (data.email) {
+        setUserEmail(data.email);
+        setUserName(data.name || "User");
+        setCurrentStep(1); // Move to success/display step
+      } else {
+        setError("Could not retrieve email. Please make sure email permission is granted.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch user information.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 1: Fetch Pages (will be used later when advanced permissions are approved)
   const fetchPages = async (token: string) => {
     setLoading(true);
     setError(null);
@@ -198,6 +232,8 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     setForms([]);
     setSelectedPage(null);
     setSelectedFormId(null);
+    setUserEmail(null);
+    setUserName(null);
     setError(null);
     setLoading(false);
     onClose();
@@ -209,16 +245,8 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       description: "Connect Facebook",
     },
     {
-      title: "Select Page",
-      description: "Choose your page",
-    },
-    {
-      title: "Select Form",
-      description: "Choose lead form",
-    },
-    {
-      title: "Complete",
-      description: "Integration ready",
+      title: "Success",
+      description: "Verified",
     },
   ];
 
@@ -267,12 +295,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {currentStep === 0 && (
               <div style={{ textAlign: "center" }}>
                 <Paragraph>
-                  Click below to sign in with Facebook and authorize access to
-                  your pages and lead forms.
+                  Click below to sign in with Facebook to test the integration.
                 </Paragraph>
                 <Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  Required permissions: pages_show_list, pages_read_engagement,
-                  pages_manage_metadata, leads_retrieval
+                  Testing with basic email permission
                 </Paragraph>
                 <Button
                   type="primary"
@@ -291,96 +317,41 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
               </div>
             )}
 
-            {/* Step 1: Select Page */}
+            {/* Step 1: Show User Info (Success) */}
             {currentStep === 1 && (
-              <div>
-                <Title level={5}>1) Select Facebook Page</Title>
-                <Paragraph type="secondary">
-                  Choose the Facebook page you want to connect
-                </Paragraph>
-                <Select
-                  size="large"
-                  placeholder="Select Facebook Page"
-                  style={{ width: "100%" }}
-                  onChange={handlePageSelect}
-                  loading={loading}
-                  options={pages.map((page) => ({
-                    label: page.name,
-                    value: page.id,
-                  }))}
-                />
-              </div>
-            )}
-
-            {/* Step 2: Select Form */}
-            {currentStep === 2 && (
-              <div>
-                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                  <div>
-                    <Text strong>Selected Page:</Text>{" "}
-                    <Text>{selectedPage?.name}</Text>
-                  </div>
-                  <div>
-                    <Title level={5}>2) Select Lead Generation Form</Title>
-                    <Paragraph type="secondary">
-                      Choose the lead form you want to sync with CRM
-                    </Paragraph>
-                    <Select
-                      size="large"
-                      placeholder="Select Lead Form"
-                      style={{ width: "100%" }}
-                      onChange={setSelectedFormId}
-                      value={selectedFormId}
-                      options={forms.map((form) => ({
-                        label: form.name,
-                        value: form.id,
-                      }))}
-                    />
-                  </div>
-                </Space>
-              </div>
-            )}
-
-            {/* Step 3: Success */}
-            {currentStep === 3 && (
               <Result
                 status="success"
                 title="Successfully Connected!"
-                subTitle="Your Facebook lead form is now connected. New leads will automatically sync to your CRM."
+                subTitle="Facebook login is working correctly"
                 icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-              />
+              >
+                <div style={{ textAlign: "left", maxWidth: 400, margin: "0 auto" }}>
+                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                    <div>
+                      <Text strong>Name:</Text>{" "}
+                      <Text>{userName}</Text>
+                    </div>
+                    <div>
+                      <Text strong>Email:</Text>{" "}
+                      <Text copyable>{userEmail}</Text>
+                    </div>
+                    <Alert
+                      message="Setup Verified!"
+                      description="The Facebook SDK and OAuth configuration are working correctly. You can now add advanced permissions for page and lead access."
+                      type="success"
+                      showIcon
+                    />
+                  </Space>
+                </div>
+              </Result>
             )}
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Button onClick={handleClose} disabled={loading}>
-              {currentStep === 3 ? "Close" : "Cancel"}
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <Button onClick={handleClose} disabled={loading} size="large">
+              {currentStep === 1 ? "Close" : "Cancel"}
             </Button>
-
-            <Space>
-              {currentStep === 1 && (
-                <Button onClick={() => setCurrentStep(0)} disabled={loading}>
-                  Back
-                </Button>
-              )}
-              {currentStep === 2 && (
-                <>
-                  <Button onClick={() => setCurrentStep(1)} disabled={loading}>
-                    Back
-                  </Button>
-                  <Button
-                    type="primary"
-                    onClick={handleConnect}
-                    loading={loading}
-                    disabled={!selectedFormId}
-                    icon={loading ? <LoadingOutlined /> : <CheckCircleOutlined />}
-                  >
-                    {loading ? "Connecting..." : "Import Leads"}
-                  </Button>
-                </>
-              )}
-            </Space>
           </div>
         </Space>
       </div>

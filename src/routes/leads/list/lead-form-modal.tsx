@@ -136,6 +136,15 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     fetchUsers();
   }, [opened]);
 
+  // Set default stage to "Raw (Unqualified)" when creating new lead
+  useEffect(() => {
+    if (action === "create" && opened && form) {
+      form.setFieldsValue({
+        stage: "Raw (Unqualified)",
+      });
+    }
+  }, [action, opened, form]);
+
   const handleCreateSource = () => {
     if (!newSourceName.trim()) return;
     setIsCreatingSource(true);
