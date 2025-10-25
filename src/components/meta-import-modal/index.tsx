@@ -91,9 +91,9 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         }
       },
       {
-        // Using basic email permission that's ready for testing
-        // This will verify the setup works before requesting advanced permissions
-        scope: "email",
+        // Full permissions for production (requires App Review approval)
+        // For testing: Use only "email" until permissions are approved
+        scope: "email,business_management,leads_retrieval,pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata",
       }
     );
   };
@@ -116,7 +116,8 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       if (data.email) {
         setUserEmail(data.email);
         setUserName(data.name || "User");
-        setCurrentStep(1); // Move to success/display step
+        // After getting user info, fetch pages
+        fetchPages(token);
       } else {
         setError("Could not retrieve email. Please make sure email permission is granted.");
       }
@@ -245,8 +246,16 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       description: "Connect Facebook",
     },
     {
-      title: "Success",
-      description: "Verified",
+      title: "Select Page",
+      description: "Choose your Page",
+    },
+    {
+      title: "Select Form",
+      description: "Choose lead form",
+    },
+    {
+      title: "Complete",
+      description: "Successfully connected",
     },
   ];
 
@@ -295,11 +304,15 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {currentStep === 0 && (
               <div style={{ textAlign: "center" }}>
                 <Paragraph>
-                  Click below to sign in with Facebook to test the integration.
+                  Sign in with Facebook to import leads from your Facebook Lead Ads.
                 </Paragraph>
-                <Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  Testing with basic email permission
-                </Paragraph>
+                <Alert
+                  message="Testing Mode"
+                  description="During testing, only app administrators, developers, and test users can access this feature. Submit for App Review to enable for all users."
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 20, textAlign: "left" }}
+                />
                 <Button
                   type="primary"
                   size="large"
@@ -317,41 +330,146 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
               </div>
             )}
 
-            {/* Step 1: Show User Info (Success) */}
+            {/* Step 1: Select Facebook Page */}
             {currentStep === 1 && (
+              <div>
+                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                  <div>
+                    <Text strong>Welcome, {userName}!</Text>
+                    <br />
+                    <Text type="secondary">{userEmail}</Text>
+                  </div>
+                  
+                  <Paragraph>
+                    Select the Facebook Page you want to import leads from:
+                  </Paragraph>
+
+                  {loading ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                      <Spin size="large" />
+                      <Paragraph style={{ marginTop: 16 }}>
+                        Loading your Facebook Pages...
+                      </Paragraph>
+                    </div>
+                  ) : pages.length > 0 ? (
+                    <Select
+                      placeholder="Select a Facebook Page"
+                      size="large"
+                      style={{ width: "100%" }}
+                      onChange={handlePageSelect}
+                      loading={loading}
+                      options={pages.map((page) => ({
+                        label: page.name,
+                        value: page.id,
+                      }))}
+                    />
+                  ) : (
+                    <Alert
+                      message="No Pages Found"
+                      description="You need to manage at least one Facebook Page to import leads. Please create or get admin access to a Page first."
+                      type="warning"
+                      showIcon
+                    />
+                  )}
+                </Space>
+              </div>
+            )}
+
+            {/* Step 2: Select Lead Form */}
+            {currentStep === 2 && (
+              <div>
+                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                  <div>
+                    <Text strong>Page Selected:</Text> {selectedPage?.name}
+                  </div>
+
+                  <Paragraph>
+                    Select the lead generation form you want to connect:
+                  </Paragraph>
+
+                  {loading ? (
+                    <div style={{ textAlign: "center", padding: 40 }}>
+                      <Spin size="large" />
+                      <Paragraph style={{ marginTop: 16 }}>
+                        Loading lead forms...
+                      </Paragraph>
+                    </div>
+                  ) : forms.length > 0 ? (
+                    <>
+                      <Select
+                        placeholder="Select a lead form"
+                        size="large"
+                        style={{ width: "100%" }}
+                        value={selectedFormId}
+                        onChange={setSelectedFormId}
+                        options={forms.map((form) => ({
+                          label: form.name,
+                          value: form.id,
+                        }))}
+                      />
+                      <Button
+                        type="primary"
+                        size="large"
+                        onClick={handleConnect}
+                        disabled={!selectedFormId}
+                        loading={loading}
+                        style={{ width: "100%", marginTop: 16 }}
+                      >
+                        Connect to CRM
+                      </Button>
+                    </>
+                  ) : (
+                    <Alert
+                      message="No Lead Forms Found"
+                      description="This page doesn't have any lead generation forms. Please create a lead ad campaign with a lead form first."
+                      type="warning"
+                      showIcon
+                    />
+                  )}
+                </Space>
+              </div>
+            )}
+
+            {/* Step 3: Success */}
+            {currentStep === 3 && (
               <Result
                 status="success"
                 title="Successfully Connected!"
-                subTitle="Facebook login is working correctly"
+                subTitle="Your Facebook leads will now be automatically imported to your CRM"
                 icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-              >
-                <div style={{ textAlign: "left", maxWidth: 400, margin: "0 auto" }}>
-                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                    <div>
-                      <Text strong>Name:</Text>{" "}
-                      <Text>{userName}</Text>
-                    </div>
-                    <div>
-                      <Text strong>Email:</Text>{" "}
-                      <Text copyable>{userEmail}</Text>
-                    </div>
-                    <Alert
-                      message="Setup Verified!"
-                      description="The Facebook SDK and OAuth configuration are working correctly. You can now add advanced permissions for page and lead access."
-                      type="success"
-                      showIcon
-                    />
-                  </Space>
-                </div>
-              </Result>
+              />
             )}
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <Button onClick={handleClose} disabled={loading} size="large">
-              {currentStep === 1 ? "Close" : "Cancel"}
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Button 
+              onClick={handleClose} 
+              disabled={loading} 
+              size="large"
+            >
+              {currentStep === 3 ? "Close" : "Cancel"}
             </Button>
+            
+            {currentStep === 1 && pages.length === 0 && !loading && (
+              <Button 
+                type="link" 
+                href="https://www.facebook.com/pages/create" 
+                target="_blank"
+              >
+                Create a Facebook Page
+              </Button>
+            )}
+            
+            {currentStep === 2 && forms.length === 0 && !loading && (
+              <Button 
+                type="link" 
+                href="https://www.facebook.com/business/tools/ads-manager" 
+                target="_blank"
+              >
+                Create Lead Ads
+              </Button>
+            )}
           </div>
         </Space>
       </div>
