@@ -9,6 +9,7 @@ import {
   Alert,
   Spin,
   Result,
+  message,
 } from "antd";
 import {
   FacebookOutlined,
@@ -18,6 +19,8 @@ import {
 import { useCreate } from "@refinedev/core";
 
 const { Title, Text, Paragraph } = Typography;
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Facebook SDK types
 declare global {
@@ -247,15 +250,14 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     }
   };
 
-  // Step 3: Connect to CRM (Testing Mode - Console Log Only)
-  const handleConnect = () => {
+  // Step 3: Connect to CRM
+  const handleConnect = async () => {
     if (!selectedPage || !selectedFormId || !userToken) return;
 
     setLoading(true);
     setError(null);
 
-    // Testing Mode: Just log the data instead of API call
-    console.log("=== TESTING MODE: Connect to CRM ===");
+    console.log("=== Connect to CRM ===");
     console.log("📋 Connection Data:", {
       page_id: selectedPage.id,
       page_name: selectedPage.name,
@@ -265,45 +267,51 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       user_email: userEmail,
       user_name: userName,
     });
-    console.log("✅ Would send to backend: POST /meta/account");
-    console.log("===================================");
 
-    // Simulate success without API call
-    setTimeout(() => {
-      setCurrentStep(3);
-      setLoading(false);
-    }, 500);
-
-    // Commented out for testing - uncomment for production
-    /*
-    createAccount(
-      {
-        resource: "meta/account",
-        values: {
+    try {
+      // Make API call to backend
+      const response = await fetch(`${API_URL}/v1/meta/account`, {
+        method: "POST",
+        headers: {
+          "x-org-id": "0199cff5-6fbb-7fa1-9233-ecc50b762395",
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include", // Include cookies
+        body: JSON.stringify({
+          user_token: userToken,
           page_id: selectedPage.id,
           form_id: selectedFormId,
-          user_token: userToken,
-        },
-      },
-      {
-        onSuccess: () => {
-          setCurrentStep(3);
-          setLoading(false);
-          setTimeout(() => {
-            onSuccess?.();
-            handleClose();
-          }, 2000);
-        },
-        onError: (error: any) => {
-          setError(
-            error?.message ||
-              "Failed to connect. Please check your configuration and try again."
-          );
-          setLoading(false);
-        },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
       }
-    );
-    */
+
+      const data = await response.json();
+      console.log("✅ API Response:", data);
+
+      // Show success toast notification with form name
+      if (data.form_name) {
+        message.success(`${data.form_name} added successfully!`, 5);
+      } else {
+        message.success("Facebook form connected successfully!", 5);
+      }
+
+      // Move to success step
+      setCurrentStep(3);
+
+    } catch (err: any) {
+      console.error("❌ Failed to connect:", err);
+      setError(
+        err?.message ||
+        "Failed to connect. Please check your configuration and try again."
+      );
+      message.error("Failed to connect to CRM. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle "Next" button to show all leads
@@ -584,7 +592,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                           loading={loading}
                           style={{ width: "100%" }}
                         >
-                          Connect to CRM (Console Log Only)
+                          Connect to CRM
                         </Button>
                       </Space>
                     </>
