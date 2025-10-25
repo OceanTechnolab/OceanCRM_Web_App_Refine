@@ -63,8 +63,52 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [allLeads, setAllLeads] = useState<any[]>([]);
 
   const { mutate: createAccount } = useCreate();
+
+  // Fetch all leads for selected form (Testing Mode)
+  const fetchLeadsForForm = async (formId: string, pageToken: string) => {
+    console.log("🔍 Fetching leads for form:", formId);
+    
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v24.0/${formId}/leads?access_token=${pageToken}`
+      );
+      const data = await response.json();
+
+      console.log("📥 Leads Response:", data);
+
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      if (data.data && data.data.length > 0) {
+        setAllLeads(data.data);
+        console.log(`✅ Found ${data.data.length} leads`);
+        return data.data;
+      } else {
+        setAllLeads([]);
+        console.log("⚠️ No leads found for this form");
+        return [];
+      }
+    } catch (err: any) {
+      console.error("❌ Failed to fetch leads:", err);
+      setError(err.message || "Failed to fetch leads.");
+      return [];
+    }
+  };
+
+  // Go back to select page
+  const handleBackToPageSelection = () => {
+    console.log("⬅️ Going back to page selection");
+    setCurrentStep(1);
+    setSelectedPage(null);
+    setSelectedFormId(null);
+    setForms([]);
+    setAllLeads([]);
+    setError(null);
+  };
 
   // Step 0: Facebook Login
   const handleFacebookLogin = () => {
@@ -161,17 +205,27 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     const page = pages.find((p) => p.id === pageId);
     if (!page) return;
 
+    console.log("=== Page Selected ===");
+    console.log("📄 Page Details:", {
+      id: page.id,
+      name: page.name,
+      has_token: !!page.access_token
+    });
+
     setSelectedPage(page);
     setLoading(true);
     setError(null);
     setForms([]);
     setSelectedFormId(null);
+    setAllLeads([]);
 
     try {
       const response = await fetch(
         `https://graph.facebook.com/v24.0/${pageId}/leadgen_forms?access_token=${page.access_token}`
       );
       const data = await response.json();
+
+      console.log("📋 Forms API Response:", data);
 
       if (data.error) {
         throw new Error(data.error.message);
@@ -180,23 +234,48 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       if (data.data && data.data.length > 0) {
         setForms(data.data);
         setCurrentStep(2);
+        console.log(`✅ Found ${data.data.length} forms:`, data.data.map((f: any) => ({ id: f.id, name: f.name })));
       } else {
         setError("No lead forms found for this page. Please create a lead generation form first.");
+        console.warn("⚠️ No forms found for this page");
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch lead forms.");
+      console.error("❌ Failed to fetch forms:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 3: Connect to CRM
+  // Step 3: Connect to CRM (Testing Mode - Console Log Only)
   const handleConnect = () => {
     if (!selectedPage || !selectedFormId || !userToken) return;
 
     setLoading(true);
     setError(null);
 
+    // Testing Mode: Just log the data instead of API call
+    console.log("=== TESTING MODE: Connect to CRM ===");
+    console.log("📋 Connection Data:", {
+      page_id: selectedPage.id,
+      page_name: selectedPage.name,
+      form_id: selectedFormId,
+      form_name: forms.find(f => f.id === selectedFormId)?.name,
+      user_token: userToken,
+      user_email: userEmail,
+      user_name: userName,
+    });
+    console.log("✅ Would send to backend: POST /meta/account");
+    console.log("===================================");
+
+    // Simulate success without API call
+    setTimeout(() => {
+      setCurrentStep(3);
+      setLoading(false);
+    }, 500);
+
+    // Commented out for testing - uncomment for production
+    /*
     createAccount(
       {
         resource: "meta/account",
@@ -224,6 +303,26 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         },
       }
     );
+    */
+  };
+
+  // Handle "Next" button to show all leads
+  const handleShowLeads = async () => {
+    if (!selectedPage || !selectedFormId) return;
+
+    setLoading(true);
+    setError(null);
+
+    console.log("=== TESTING MODE: Show All Leads ===");
+    console.log("📋 Request Details:", {
+      form_id: selectedFormId,
+      form_name: forms.find(f => f.id === selectedFormId)?.name,
+      page_id: selectedPage.id,
+      page_name: selectedPage.name,
+    });
+
+    await fetchLeadsForForm(selectedFormId, selectedPage.access_token);
+    setLoading(false);
   };
 
   const handleClose = () => {
@@ -379,8 +478,17 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {currentStep === 2 && (
               <div>
                 <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                  <div>
-                    <Text strong>Page Selected:</Text> {selectedPage?.name}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <Text strong>Page Selected:</Text> {selectedPage?.name}
+                    </div>
+                    <Button 
+                      type="link" 
+                      onClick={handleBackToPageSelection}
+                      size="small"
+                    >
+                      ← Change Page
+                    </Button>
                   </div>
 
                   <Paragraph>
@@ -407,16 +515,78 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                           value: form.id,
                         }))}
                       />
-                      <Button
-                        type="primary"
-                        size="large"
-                        onClick={handleConnect}
-                        disabled={!selectedFormId}
-                        loading={loading}
-                        style={{ width: "100%", marginTop: 16 }}
-                      >
-                        Connect to CRM
-                      </Button>
+                      
+                      {/* Show all leads section */}
+                      {allLeads.length > 0 && (
+                        <div style={{ 
+                          marginTop: 20, 
+                          padding: 16, 
+                          background: "#f5f5f5", 
+                          borderRadius: 8,
+                          maxHeight: 300,
+                          overflowY: "auto"
+                        }}>
+                          <Text strong style={{ fontSize: 16 }}>
+                            Available Leads ({allLeads.length})
+                          </Text>
+                          <div style={{ marginTop: 12 }}>
+                            {allLeads.map((lead, index) => (
+                              <div 
+                                key={lead.id} 
+                                style={{ 
+                                  padding: 12, 
+                                  background: "white", 
+                                  marginBottom: 8, 
+                                  borderRadius: 4,
+                                  border: "1px solid #d9d9d9"
+                                }}
+                              >
+                                <Text strong>Lead #{index + 1}</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  ID: {lead.id}
+                                </Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  Created: {new Date(lead.created_time).toLocaleString()}
+                                </Text>
+                                {lead.field_data && (
+                                  <div style={{ marginTop: 8 }}>
+                                    {lead.field_data.map((field: any) => (
+                                      <div key={field.name} style={{ fontSize: 12 }}>
+                                        <Text strong>{field.name}:</Text> {field.values.join(", ")}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <Space style={{ width: "100%", marginTop: 16 }} direction="vertical">
+                        <Button
+                          type="default"
+                          size="large"
+                          onClick={handleShowLeads}
+                          disabled={!selectedFormId}
+                          loading={loading}
+                          style={{ width: "100%" }}
+                        >
+                          {allLeads.length > 0 ? "Refresh Leads" : "Next: Show All Leads"}
+                        </Button>
+                        <Button
+                          type="primary"
+                          size="large"
+                          onClick={handleConnect}
+                          disabled={!selectedFormId}
+                          loading={loading}
+                          style={{ width: "100%" }}
+                        >
+                          Connect to CRM (Console Log Only)
+                        </Button>
+                      </Space>
                     </>
                   ) : (
                     <Alert
