@@ -137,7 +137,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       {
         // Full permissions for production (requires App Review approval)
         // For testing: Use only "email" until permissions are approved
-        scope: "email,business_management,leads_retrieval,pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata",
+        scope: "ads_management,business_management,leads_retrieval,pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata",
       }
     );
   };
