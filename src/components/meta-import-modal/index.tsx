@@ -269,11 +269,14 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     });
 
     try {
+      // Get org ID from localStorage (same pattern as other components)
+      const orgId = localStorage.getItem("org_id") || "0199cff5-6fbb-7fa1-9233-ecc50b762395";
+      
       // Make API call to backend
       const response = await fetch(`${API_URL}/v1/meta/account`, {
         method: "POST",
         headers: {
-          "x-org-id": "0199cff5-6fbb-7fa1-9233-ecc50b762395",
+          "x-org-id": orgId,
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
@@ -286,6 +289,13 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       });
 
       if (!response.ok) {
+        // Handle 401 specifically - session expired or invalid
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({ detail: "Unauthorized" }));
+          console.error("🔒 401 Unauthorized:", errorData);
+          throw new Error("Session expired or invalid. Please refresh the page and log in to OceanCRM again.");
+        }
+        
         throw new Error(`API request failed with status ${response.status}`);
       }
 
