@@ -1,7 +1,7 @@
-import { DeleteButton, EditButton, List, useTable } from "@refinedev/antd";
-import { Input, Space, Table, Tag, Button } from "antd";
+import { DeleteButton, EditButton, List, useTable, useSelect, FilterDropdown } from "@refinedev/antd";
+import { Input, Space, Table, Tag, Button, Select } from "antd";
 import { useState } from "react";
-import { EyeOutlined, FacebookOutlined } from "@ant-design/icons";
+import { EyeOutlined, FacebookOutlined, FilterOutlined } from "@ant-design/icons";
 import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
 import { QuickActivityButton } from "@/components/quick-activity-button";
@@ -22,7 +22,7 @@ export const LeadListPage = () => {
   const [editingLeadId, setEditingLeadId] = useState<string | undefined>();
   const [editingLeadData, setEditingLeadData] = useState<any>(null);
 
-  const { tableProps } = useTable({
+  const { tableProps, tableQuery } = useTable({
     resource: "lead",
     pagination: {
       mode: "server",
@@ -44,15 +44,27 @@ export const LeadListPage = () => {
     },
   });
 
+  // Get list of users for filter dropdown
+  const { selectProps: userSelectProps } = useSelect({
+    resource: "user",
+    optionLabel: "name",
+    optionValue: "id",
+  });
+
+  const total = tableQuery?.data?.total || 0;
+
+  console.log("[LEAD_LIST] tableProps.pagination:", tableProps.pagination);
+
   return (
     <>
       <List
+        title="Leads"
         headerButtons={({ defaultButtons }) => (
           <>
             <Search
-              placeholder="Search leads"
+              placeholder="Search by business, email"
               onSearch={(value) => setSearch(value)}
-              style={{ width: 200 }}
+              style={{ width: 300 }}
               allowClear
             />
             <Button
@@ -75,7 +87,16 @@ export const LeadListPage = () => {
           },
         }}
       >
-        <Table {...tableProps} rowKey="id">
+        <Table 
+          {...tableProps} 
+          rowKey="id"
+          pagination={{
+            ...tableProps.pagination,
+            showTotal: (total: number) => `${total} leads in total`,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '100', ],
+          }}
+        >
           <Table.Column
             dataIndex="business"
             title="Business"
@@ -143,22 +164,36 @@ export const LeadListPage = () => {
             )}
           />
           <Table.Column
-            dataIndex="assigned_user"
+            dataIndex={["assigned_user", "id"]}
             title="Assigned To"
-            render={(assigned_user: any) => (
-              <Space>
-                {assigned_user && (
-                  <>
-                    <CustomAvatar
-                      name={assigned_user?.name}
-                      src={assigned_user?.avatar}
-                    />
-                    <Text>{assigned_user?.name}</Text>
-                  </>
-                )}
-                {!assigned_user && <Text type="secondary">Unassigned</Text>}
-              </Space>
+            filterIcon={<FilterOutlined />}
+            filterDropdown={(props) => (
+              <FilterDropdown {...props}>
+                <Select
+                  {...userSelectProps}
+                  style={{ minWidth: 200 }}
+                  mode="multiple"
+                  placeholder="Select users"
+                />
+              </FilterDropdown>
             )}
+            render={(_, record: any) => {
+              const assigned_user = record.assigned_user;
+              return (
+                <Space>
+                  {assigned_user && (
+                    <>
+                      <CustomAvatar
+                        name={assigned_user?.name}
+                        src={assigned_user?.avatar}
+                      />
+                      <Text>{assigned_user?.name}</Text>
+                    </>
+                  )}
+                  {!assigned_user && <Text type="secondary">Unassigned</Text>}
+                </Space>
+              );
+            }}
           />
           <Table.Column
             dataIndex="product"

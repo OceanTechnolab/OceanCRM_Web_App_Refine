@@ -148,30 +148,57 @@ export const dataProvider: DataProvider = {
   getList: async ({ resource, pagination, filters, sorters, meta }) => {
     const url = `${API_URL}/${resource}`;
 
-    // Handle pagination - Refine uses current/pageSize
-    const current = (pagination as any)?.current ?? 1;
+    // Handle pagination - Refine uses currentPage/pageSize (not current/pageSize)
+    const currentPage =
+      (pagination as any)?.currentPage ?? (pagination as any)?.current ?? 1;
     const pageSize = (pagination as any)?.pageSize ?? 10;
     const mode = (pagination as any)?.mode ?? "server";
+
+    console.log("[DATA_PROVIDER] getList called with:", {
+      resource,
+      pagination: JSON.stringify(pagination),
+      currentPage,
+      pageSize,
+      mode,
+    });
 
     const query: {
       page?: number;
       page_size?: number;
       q?: string;
+      assigned_user_id?: string;
     } = {};
 
     if (mode === "server") {
-      query.page = current;
+      query.page = currentPage;
       query.page_size = pageSize;
     }
 
-    // Handle search filter (q parameter)
+    // Handle filters
     if (filters) {
       filters.forEach((filter) => {
-        if ("field" in filter && filter.field === "q" && filter.value) {
-          query.q = filter.value;
+        if ("field" in filter && filter.value) {
+          // Handle search filter (q parameter)
+          if (filter.field === "q") {
+            query.q = filter.value;
+          }
+          // Handle assigned_user filter
+          else if (
+            filter.field === "assigned_user" ||
+            filter.field === "assigned_user.id"
+          ) {
+            // If multiple values, join them with comma
+            if (Array.isArray(filter.value)) {
+              query.assigned_user_id = filter.value.join(",");
+            } else {
+              query.assigned_user_id = filter.value;
+            }
+          }
         }
       });
     }
+
+    console.log("[DATA_PROVIDER] API query:", query);
 
     const { data } = await axiosInstance.get(
       `${url}?${stringify(query, { skipNull: true, skipEmptyString: true })}`,
