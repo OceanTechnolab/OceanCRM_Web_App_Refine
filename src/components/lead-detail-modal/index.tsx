@@ -43,7 +43,7 @@ import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
 import { interactionService } from "@/services/interaction.service";
 import { appointmentService } from "@/services/appointment.service";
-import { API_BASE_URL } from "@/providers/data";
+import { axiosInstance, API_URL } from "@/providers/data";
 import type { Interaction, InteractionType } from "@/interfaces/interaction";
 import type { Appointment, AppointmentType } from "@/interfaces/appointment";
 
@@ -115,9 +115,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       try {
         const data = await interactionService.getInteractionsByLeadId(leadId);
         setInteractions(data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching interactions:", error);
-        message.error("Failed to load activities");
+        message.error(error.message || "Failed to load activities");
       } finally {
         setInteractionsLoading(false);
       }
@@ -135,9 +135,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       try {
         const data = await appointmentService.getAppointmentsByLeadId(leadId);
         setAppointments(data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching appointments:", error);
-        message.error("Failed to load appointments");
+        message.error(error.message || "Failed to load appointments");
       } finally {
         setAppointmentsLoading(false);
       }
@@ -153,26 +153,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
       setUsersLoading(true);
       try {
-        const orgId = localStorage.getItem('org_id');
-        const response = await fetch(`${API_BASE_URL}/v1/user`, {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'x-org-id': orgId || '',
-            'Accept': 'application/json',
-          },
-        });
+        // Note: x-org-id header is automatically added by Axios interceptor
+        const response = await axiosInstance.get(`${API_URL}/user`);
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch users');
-        }
-
-        const data = await response.json();
-        console.log('[USERS] Fetched users:', data);
-        setUsers(data);
-      } catch (error) {
+        console.log('[USERS] Fetched users:', response.data);
+        setUsers(response.data);
+      } catch (error: any) {
         console.error("Error fetching users:", error);
-        message.error("Failed to load users");
+        // Use centralized error message
+        message.error(error.message || "Failed to load users");
       } finally {
         setUsersLoading(false);
       }
@@ -214,13 +203,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       form.resetFields();
     } catch (error: any) {
       console.error("Error creating interaction:", error);
-      
-      // Check if it's a session expiry error
-      if (error.status === 422 || error.statusCode === 422) {
-        message.error(error.message || "Your session has expired. Please login again.");
-      } else {
-        message.error(error.message || "Failed to log activity");
-      }
+      // Use centralized error message from interceptor
+      message.error(error.message || "Failed to log activity");
     } finally {
       setIsSubmitting(false);
     }
@@ -249,12 +233,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       appointmentForm.resetFields();
     } catch (error: any) {
       console.error("Error creating appointment:", error);
-      
-      if (error.status === 422 || error.statusCode === 422) {
-        message.error(error.message || "Your session has expired. Please login again.");
-      } else {
-        message.error(error.message || "Failed to schedule appointment");
-      }
+      // Use centralized error message from interceptor
+      message.error(error.message || "Failed to schedule appointment");
     } finally {
       setIsSubmitting(false);
     }

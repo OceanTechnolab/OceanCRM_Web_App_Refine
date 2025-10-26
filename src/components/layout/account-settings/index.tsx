@@ -4,7 +4,7 @@ import { useGetIdentity, useLogout } from "@refinedev/core";
 import { CloseOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
 
-import { API_BASE_URL } from "@/providers/data";
+import { axiosInstance, API_URL } from "@/providers/data";
 import { getNameInitials } from "@/utilities";
 
 import { CustomAvatar } from "../../custom-avatar";
@@ -45,24 +45,9 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-        method: "GET",
-        credentials: "include",
-      });
+      const response = await axiosInstance.get(`${API_URL}/user/logged`);
 
-      if (!response.ok) {
-        if (response.status === 422) {
-          const errorData = await response.json();
-          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
-            message.error("Your session has expired. Please login again.");
-            logout();
-            return;
-          }
-        }
-        throw new Error("Failed to fetch user data");
-      }
-
-      const data = await response.json();
+      const data = response.data;
       const user: UserData = {
         id: data.id,
         name: data.name || data.email,
@@ -77,9 +62,18 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
         email: user.email,
         mobile: user.mobile,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user data:", error);
-      message.error("Failed to load user data");
+      
+      // Check if it's an authentication error (handled by interceptor)
+      if (error.name === "AuthenticationError") {
+        message.error(error.message);
+        logout();
+        return;
+      }
+      
+      // Use centralized error message
+      message.error(error.message || "Failed to load user data");
     } finally {
       setIsLoading(false);
     }
@@ -88,36 +82,26 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const handleSave = async (values: any) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/user/${userId}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: values.name,
-          email: values.email,
-          mobile: values.mobile,
-        }),
+      const response = await axiosInstance.put(`${API_URL}/user/${userId}`, {
+        name: values.name,
+        email: values.email,
+        mobile: values.mobile,
       });
-
-      if (!response.ok) {
-        if (response.status === 422) {
-          const errorData = await response.json();
-          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
-            message.error("Your session has expired. Please login again.");
-            logout();
-            return;
-          }
-        }
-        throw new Error("Failed to update user data");
-      }
 
       message.success("Account settings updated successfully");
       setOpened(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user data:", error);
-      message.error("Failed to update account settings");
+      
+      // Check if it's an authentication error
+      if (error.name === "AuthenticationError") {
+        message.error(error.message);
+        logout();
+        return;
+      }
+      
+      // Use centralized error message
+      message.error(error.message || "Failed to update account settings");
     } finally {
       setIsSaving(false);
     }

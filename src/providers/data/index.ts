@@ -2,22 +2,25 @@ import dataProviderSimpleRest from "@refinedev/simple-rest";
 import type { DataProvider } from "@refinedev/core";
 import axios from "axios";
 import { stringify } from "query-string";
+import { getOrgId } from "@/utilities/organization";
 
 // Use environment variable for API URL, fallback to localhost for development
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 export const API_URL = `${API_BASE_URL}/v1`;
 
 // Create axios instance with credentials included for cookie-based auth
-const axiosInstance = axios.create({
+// Export this instance so other parts of the app can use it for API calls
+export const axiosInstance = axios.create({
   withCredentials: true, // Important: include cookies for JWT auth
 });
 
 // Add request interceptor to include org-id header
 axiosInstance.interceptors.request.use((config) => {
-  // Add x-org-id header from localStorage
-  const orgId = localStorage.getItem('org_id');
+  // Add x-org-id header using centralized organization utility
+  const orgId = getOrgId();
   if (orgId) {
-    config.headers['x-org-id'] = orgId;
+    config.headers["x-org-id"] = orgId;
   }
 
   return config;
@@ -27,46 +30,113 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => {
     // If response has 'items' field (paginated response), transform it
-    if (response.data && response.data.items && Array.isArray(response.data.items)) {
+    if (
+      response.data &&
+      response.data.items &&
+      Array.isArray(response.data.items)
+    ) {
       // Keep the original structure but also add 'data' field for compatibility
       response.data.data = response.data.items;
     }
     return response;
   },
   (error) => {
-    // Handle authentication errors
-    if (error.response?.status === 422) {
-      const errorDetail = error.response?.data?.detail || "";
+    // Centralized error handling for all API calls
+    const status = error.response?.status;
+    const errorDetail = error.response?.data?.detail || "";
 
+    // Create a base error object
+    const baseError = {
+      status,
+      statusCode: status,
+      message: "",
+      detail: errorDetail,
+      name: "ApiError",
+      originalError: error,
+    };
+
+    // Handle different error types with user-friendly messages
+    if (!error.response) {
+      // Network error (no response from server)
+      console.error("[API] Network error:", error.message);
+      baseError.status = 0;
+      baseError.statusCode = 0;
+      baseError.message =
+        "Network error. Please check your internet connection and try again.";
+      baseError.name = "NetworkError";
+    } else if (status === 401) {
+      // Unauthorized - session expired or invalid
+      console.error("[API] 401 Unauthorized:", errorDetail);
+      baseError.message =
+        errorDetail || "Session expired. Please log in again.";
+      baseError.name = "AuthenticationError";
+    } else if (status === 422) {
+      // Unprocessable Entity - validation error or missing token
       if (errorDetail.includes("Missing token in request")) {
-        // Create a standardized error object that matches what the auth provider expects
-        const authError = {
-          status: 422,
-          statusCode: 422,
-          message: "Missing token in request.",
-          detail: "Missing token in request.",
-          name: "AuthenticationError"
-        };
-
-        // Reject with the standardized error - this will be caught by Refine's error handling
-        return Promise.reject(authError);
+        console.error("[API] 422 Missing token");
+        baseError.message = "Your session has expired. Please log in again.";
+        baseError.name = "AuthenticationError";
+      } else {
+        console.error("[API] 422 Validation error:", errorDetail);
+        baseError.message =
+          errorDetail || "Validation error. Please check your input.";
+        baseError.name = "ValidationError";
       }
+    } else if (status === 403) {
+      // Forbidden - no permission
+      console.error("[API] 403 Forbidden:", errorDetail);
+      baseError.message =
+        errorDetail || "You don't have permission to perform this action.";
+      baseError.name = "PermissionError";
+    } else if (status === 404) {
+      // Not Found
+      console.error("[API] 404 Not Found:", errorDetail);
+      baseError.message =
+        errorDetail || "The requested resource was not found.";
+      baseError.name = "NotFoundError";
+    } else if (status === 409) {
+      // Conflict - duplicate or constraint violation
+      console.error("[API] 409 Conflict:", errorDetail);
+      baseError.message =
+        errorDetail || "This operation conflicts with existing data.";
+      baseError.name = "ConflictError";
+    } else if (status === 500) {
+      // Internal Server Error
+      console.error("[API] 500 Server error:", errorDetail);
+      baseError.message =
+        errorDetail ||
+        "Internal server error. Please try again later or contact support.";
+      baseError.name = "ServerError";
+    } else if (status === 503) {
+      // Service Unavailable
+      console.error("[API] 503 Service Unavailable:", errorDetail);
+      baseError.message =
+        "Service temporarily unavailable. Please try again in a moment.";
+      baseError.name = "ServiceUnavailableError";
+    } else if (status >= 400 && status < 500) {
+      // Other 4xx errors
+      console.error(`[API] ${status} Client error:`, errorDetail);
+      baseError.message =
+        errorDetail ||
+        `Request error (${status}). Please check your request and try again.`;
+      baseError.name = "ClientError";
+    } else if (status >= 500) {
+      // Other 5xx errors
+      console.error(`[API] ${status} Server error:`, errorDetail);
+      baseError.message =
+        errorDetail || `Server error (${status}). Please try again later.`;
+      baseError.name = "ServerError";
+    } else {
+      // Unknown error
+      console.error("[API] Unknown error:", error);
+      baseError.message =
+        errorDetail || "An unexpected error occurred. Please try again.";
+      baseError.name = "UnknownError";
     }
 
-    // Handle other 401 errors as before
-    if (error.response?.status === 401) {
-      const authError = {
-        status: 401,
-        statusCode: 401,
-        message: error.response?.data?.detail || "Unauthorized",
-        name: "AuthenticationError"
-      };
-      return Promise.reject(authError);
-    }
-
-    // For all other errors, pass through as-is
-    return Promise.reject(error);
-  }
+    // Reject with the standardized error
+    return Promise.reject(baseError);
+  },
 );
 
 // Get the base simple-rest data provider
@@ -104,7 +174,7 @@ export const dataProvider: DataProvider = {
     }
 
     const { data } = await axiosInstance.get(
-      `${url}?${stringify(query, { skipNull: true, skipEmptyString: true })}`
+      `${url}?${stringify(query, { skipNull: true, skipEmptyString: true })}`,
     );
 
     return {
@@ -118,11 +188,11 @@ export const dataProvider: DataProvider = {
     // This is a workaround for the backend not having GET /v1/lead/{id} endpoint
     if (resource === "lead") {
       const url = `${API_URL}/${resource}`;
-      
+
       // Fetch with a large page size to increase chances of finding the lead
       // In production, this should be replaced with a proper backend endpoint
       const { data } = await axiosInstance.get(
-        `${url}?${stringify({ page: 1, page_size: 1000 }, { skipNull: true })}`
+        `${url}?${stringify({ page: 1, page_size: 1000 }, { skipNull: true })}`,
       );
 
       const items = data.items || data.data || data;

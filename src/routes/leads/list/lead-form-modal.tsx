@@ -120,11 +120,8 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
 
       setLoadingUsers(true);
       try {
-        // Get org ID from localStorage or your auth context
-        const orgId =
-          localStorage.getItem("org_id") ||
-          "0199cff5-6fbb-7fa1-9233-ecc50b762395";
-        const fetchedUsers = await userService.getUsers(orgId);
+        // Note: org_id is automatically added by Axios interceptor
+        const fetchedUsers = await userService.getUsers();
         setUsers(fetchedUsers);
       } catch (error) {
         console.error("Failed to fetch users:", error);

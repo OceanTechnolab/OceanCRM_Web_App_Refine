@@ -1,6 +1,7 @@
 import type { AuthProvider } from "@refinedev/core";
 
-import { API_BASE_URL } from "./data";
+import { API_BASE_URL, axiosInstance } from "./data";
+import { setOrgList, clearOrgData, getOrgId } from "@/utilities/organization";
 
 /**
  * For demo purposes and to make it easier to test the app, you can use the following credentials:
@@ -13,38 +14,31 @@ export const authCredentials = {
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/v1/auth/login`,
+        {
+          email,
+          password,
         },
-        credentials: "include", // Important: allows cookies to be set
-        body: JSON.stringify({ email, password }),
-      });
+      );
 
-      if (!response.ok) {
-        const error = await response.json();
-        return {
-          success: false,
-          error: {
-            message: error.detail || "Login failed",
-            name: "LoginError",
-          },
-        };
-      }
+      // Fetch the user's organizations
+      try {
+        const orgResponse = await axiosInstance.get(
+          `${API_BASE_URL}/v1/org/current`,
+        );
 
-      // Fetch the user's organizations to get org_id
-      const orgResponse = await fetch(`${API_BASE_URL}/v1/org/current`, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (orgResponse.ok) {
-        const orgs = await orgResponse.json();
-        if (orgs && orgs.length > 0) {
-          // Store the first org_id in localStorage
-          localStorage.setItem("org_id", orgs[0].id);
+        if (orgResponse.data && orgResponse.data.length > 0) {
+          // Store all organizations and set the first one as current
+          setOrgList(orgResponse.data);
+          console.log(
+            "[LOGIN] Loaded",
+            orgResponse.data.length,
+            "organization(s)",
+          );
         }
+      } catch (orgError) {
+        console.error("[LOGIN] Failed to fetch organizations:", orgError);
       }
 
       // Cookies are automatically stored by the browser
@@ -57,31 +51,27 @@ export const authProvider: AuthProvider = {
         success: true,
         redirectTo: redirectPath,
       };
-    } catch (e) {
-      const error = e as Error;
-
+    } catch (error: any) {
       return {
         success: false,
         error: {
-          message: "message" in error ? error.message : "Login failed",
-          name: "name" in error ? error.name : "Network error",
+          message:
+            error.response?.data?.detail || error.message || "Login failed",
+          name: error.name || "LoginError",
         },
       };
     }
   },
   logout: async () => {
     try {
-      await fetch(`${API_BASE_URL}/v1/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await axiosInstance.post(`${API_BASE_URL}/v1/auth/logout`);
     } catch (error) {
       // Continue with logout even if API call fails
       console.error("Logout error:", error);
     }
 
-    // Clear stored data
-    localStorage.removeItem("org_id");
+    // Clear all organization data using centralized utility
+    clearOrgData();
 
     return {
       success: true,
@@ -93,8 +83,8 @@ export const authProvider: AuthProvider = {
     if (error.statusCode === 401 || error.status === 401) {
       console.log("[AUTH] 401 Unauthorized - clearing session and logging out");
 
-      // Clear all auth data immediately
-      localStorage.removeItem("org_id");
+      // Clear all organization data
+      clearOrgData();
 
       return {
         logout: true,
@@ -106,12 +96,14 @@ export const authProvider: AuthProvider = {
     // Handle 422 Unprocessable Content with missing token message
     if (error.statusCode === 422 || error.status === 422) {
       const errorMessage = error.message || error.detail || "";
-      
-      if (errorMessage.includes("Missing token in request")) {
-        console.log("[AUTH] 422 Missing token - clearing session and logging out");
 
-        // Clear all auth data immediately
-        localStorage.removeItem("org_id");
+      if (errorMessage.includes("Missing token in request")) {
+        console.log(
+          "[AUTH] 422 Missing token - clearing session and logging out",
+        );
+
+        // Clear all organization data
+        clearOrgData();
 
         return {
           logout: true,
@@ -119,7 +111,7 @@ export const authProvider: AuthProvider = {
           error: {
             ...error,
             message: "Your session has expired. Please login again.",
-            name: "Session Expired"
+            name: "Session Expired",
           },
         };
       }
@@ -129,10 +121,9 @@ export const authProvider: AuthProvider = {
   },
   check: async () => {
     try {
-      // For same-origin requests, we can simply check if org_id exists
-      // The actual authentication will be verified by the server via cookies
-      const orgId = localStorage.getItem("org_id");
-      
+      // Check if org_id exists using centralized utility
+      const orgId = getOrgId();
+
       if (!orgId) {
         return {
           authenticated: false,
@@ -154,36 +145,17 @@ export const authProvider: AuthProvider = {
   },
   getIdentity: async () => {
     try {
-      // For same-origin requests, simply make the request with credentials
-      const response = await fetch(`${API_BASE_URL}/v1/user/logged`, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        // Handle 422 specifically to trigger logout via onError
-        if (response.status === 422) {
-          const errorData = await response.json();
-          if (errorData.detail && errorData.detail.includes("Missing token in request")) {
-            const error = new Error("Missing token in request.") as any;
-            error.status = 422;
-            error.statusCode = 422;
-            error.detail = "Missing token in request.";
-            throw error;
-          }
-        }
-        return null;
-      }
-
-      const data = await response.json();
+      const response = await axiosInstance.get(
+        `${API_BASE_URL}/v1/user/logged`,
+      );
 
       // Map FastAPI user response to expected format
       return {
-        id: data.id,
-        name: data.name || data.email,
-        email: data.email,
-        mobile: data.mobile,
-        avatarUrl: data.avatar_url,
+        id: response.data.id,
+        name: response.data.name || response.data.email,
+        email: response.data.email,
+        mobile: response.data.mobile,
+        avatarUrl: response.data.avatar_url,
       };
     } catch (error) {
       return null;

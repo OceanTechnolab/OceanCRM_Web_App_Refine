@@ -17,10 +17,9 @@ import {
   LoadingOutlined,
 } from "@ant-design/icons";
 import { useCreate } from "@refinedev/core";
+import { axiosInstance, API_URL } from "../../providers/data";
 
 const { Title, Text, Paragraph } = Typography;
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Facebook SDK types
 declare global {
@@ -269,42 +268,23 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     });
 
     try {
-      // Get org ID from localStorage (same pattern as other components)
-      const orgId = localStorage.getItem("org_id") || "0199cff5-6fbb-7fa1-9233-ecc50b762395";
+      // Note: x-org-id header is automatically added by Axios interceptor
       
-      // Make API call to backend
-      const response = await fetch(`${API_URL}/v1/meta/account`, {
-        method: "POST",
-        headers: {
-          "x-org-id": orgId,
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include", // Include cookies
-        body: JSON.stringify({
+      // Make API call to backend using axios
+      const response = await axiosInstance.post(
+        `${API_URL}/meta/account`,
+        {
           user_token: userToken,
           page_id: selectedPage.id,
           form_id: selectedFormId,
-        }),
-      });
+        },
+      );
 
-      if (!response.ok) {
-        // Handle 401 specifically - session expired or invalid
-        if (response.status === 401) {
-          const errorData = await response.json().catch(() => ({ detail: "Unauthorized" }));
-          console.error("🔒 401 Unauthorized:", errorData);
-          throw new Error("Session expired or invalid. Please refresh the page and log in to OceanCRM again.");
-        }
-        
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("✅ API Response:", data);
+      console.log("✅ API Response:", response.data);
 
       // Show success toast notification with form name
-      if (data.form_name) {
-        message.success(`${data.form_name} added successfully!`, 5);
+      if (response.data.form_name) {
+        message.success(`${response.data.form_name} added successfully!`, 5);
       } else {
         message.success("Facebook form connected successfully!", 5);
       }
@@ -314,11 +294,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
     } catch (err: any) {
       console.error("❌ Failed to connect:", err);
-      setError(
-        err?.message ||
-        "Failed to connect. Please check your configuration and try again."
-      );
-      message.error("Failed to connect to CRM. Please try again.");
+      
+      // Use centralized error message from interceptor
+      setError(err.message || "Failed to connect. Please try again.");
+      message.error(err.message || "Failed to connect to CRM. Please try again.");
     } finally {
       setLoading(false);
     }
