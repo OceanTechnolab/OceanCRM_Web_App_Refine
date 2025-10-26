@@ -145,6 +145,14 @@ export const authProvider: AuthProvider = {
   },
   getIdentity: async () => {
     try {
+      // Check if org_id exists before making the request
+      const orgId = getOrgId();
+
+      if (!orgId) {
+        console.log("[AUTH] No org_id found, skipping getIdentity");
+        return null;
+      }
+
       const response = await axiosInstance.get(
         `${API_BASE_URL}/v1/user/logged`,
       );

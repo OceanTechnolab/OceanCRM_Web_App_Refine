@@ -216,40 +216,48 @@ export const LeadListPage = () => {
         </Table>
       </List>
 
-      <LeadFormModal
-        action="create"
-        opened={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
-      <LeadFormModal
-        action="edit"
-        opened={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingLeadId(undefined);
-          setEditingLeadData(null);
-        }}
-        leadId={editingLeadId}
-        leadData={editingLeadData}
-      />
-      <LeadDetailModal
-        leadId={selectedLeadId}
-        leadData={selectedLeadData}
-        open={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedLeadId(null);
-          setSelectedLeadData(null);
-        }}
-      />
-      <MetaImportModal
-        opened={isMetaImportModalOpen}
-        onClose={() => setIsMetaImportModalOpen(false)}
-        onSuccess={() => {
-          // Refresh the table after successful import
-          window.location.reload();
-        }}
-      />
+      {isCreateModalOpen && (
+        <LeadFormModal
+          action="create"
+          opened={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+        />
+      )}
+      {isEditModalOpen && (
+        <LeadFormModal
+          action="edit"
+          opened={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingLeadId(undefined);
+            setEditingLeadData(null);
+          }}
+          leadId={editingLeadId}
+          leadData={editingLeadData}
+        />
+      )}
+      {isDetailModalOpen && (
+        <LeadDetailModal
+          leadId={selectedLeadId}
+          leadData={selectedLeadData}
+          open={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedLeadId(null);
+            setSelectedLeadData(null);
+          }}
+        />
+      )}
+      {isMetaImportModalOpen && (
+        <MetaImportModal
+          opened={isMetaImportModalOpen}
+          onClose={() => setIsMetaImportModalOpen(false)}
+          onSuccess={() => {
+            // Refresh the table after successful import
+            window.location.reload();
+          }}
+        />
+      )}
     </>
   );
 };

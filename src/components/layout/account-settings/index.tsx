@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetIdentity, useLogout } from "@refinedev/core";
+import { useLogout } from "@refinedev/core";
 
 import { CloseOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
@@ -33,7 +33,6 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const { data: identity } = useGetIdentity<UserData>();
   const { mutate: logout } = useLogout();
 
   useEffect(() => {
