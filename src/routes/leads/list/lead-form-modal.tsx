@@ -133,14 +133,18 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     fetchUsers();
   }, [opened]);
 
-  // Set default stage to "Raw (Unqualified)" when creating new lead
+  // Set default values when creating new lead
   useEffect(() => {
-    if (action === "create" && opened && form) {
+    if (action === "create" && opened && form && identity?.id) {
       form.setFieldsValue({
         stage: "Raw (Unqualified)",
+        title: "Mr.",
+        since: dayjs(),
+        country: "India",
+        assigned_user_id: identity.id,
       });
     }
-  }, [action, opened, form]);
+  }, [action, opened, form, identity]);
 
   const handleCreateSource = () => {
     if (!newSourceName.trim()) return;
@@ -358,8 +362,8 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
       onCancel={handleModalClose}
       afterOpenChange={handleModalAfterOpen}
       title={action === "create" ? "Enter Lead" : "Edit Lead"}
-      width={1150}
-      style={{ top: 10 }}
+      width="95%"
+      style={{ top: 20, maxWidth: 1800 }}
       okText="Save & Close"
       cancelText="Cancel"
       styles={{
@@ -374,7 +378,9 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
       <Form
         {...formProps}
         form={form}
-        layout="vertical"
+        layout="horizontal"
+        labelCol={{ span: 6 }}
+        wrapperCol={{ span: 18 }}
         onFinish={handleFinish}
       >
         {/* Core Data Section */}
@@ -397,41 +403,35 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Business"
               name="business_name"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" size="small" />
+              <Input placeholder="" />
             </Form.Item>
 
-            <Row gutter={8}>
-              <Col span={6}>
+            <Form.Item label="Name">
+              <Input.Group compact>
                 <Form.Item
-                  label="Name"
                   name="title"
-                  style={{ marginBottom: 10 }}
+                  noStyle
                 >
-                  <Select placeholder="Mr." allowClear size="small">
+                  <Select placeholder="Mr." allowClear style={{ width: '25%' }}>
                     <Select.Option value="Mr.">Mr.</Select.Option>
                     <Select.Option value="Ms.">Ms.</Select.Option>
                   </Select>
                 </Form.Item>
-              </Col>
-              <Col span={18}>
                 <Form.Item
-                  label=" "
                   name="contact_person"
-                  style={{ marginBottom: 10 }}
+                  noStyle
                 >
-                  <Input placeholder="Contact Person Name" size="small" />
+                  <Input placeholder="Contact Person Name" style={{ width: '75%' }} />
                 </Form.Item>
-              </Col>
-            </Row>
+              </Input.Group>
+            </Form.Item>
 
             <Form.Item
               label="Designation"
               name="designation"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" size="small" />
+              <Input placeholder="" />
             </Form.Item>
 
             <Form.Item
@@ -443,9 +443,8 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                   message: "Enter valid 10-digit Indian mobile number",
                 },
               ]}
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="10-digit mobile number" addonBefore="+91" size="small" />
+              <Input placeholder="10-digit mobile number" addonBefore="+91" />
             </Form.Item>
 
             <Form.Item
@@ -454,17 +453,15 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               rules={[
                 { type: "email", message: "Invalid email" },
               ]}
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" size="small" />
+              <Input placeholder="" />
             </Form.Item>
 
             <Form.Item
               label="Website"
               name="website"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" size="small" />
+              <Input placeholder="" />
             </Form.Item>
           </Col>
 
@@ -473,25 +470,22 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Address"
               name="address"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="Line 1" size="small" />
+              <Input placeholder="Line 1" />
             </Form.Item>
 
             <Form.Item
               label=" "
               name="address_line2"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="Line 2" size="small" />
+              <Input placeholder="Line 2" />
             </Form.Item>
 
             <Form.Item
               label="Country"
               name="country"
-              style={{ marginBottom: 10 }}
             >
-              <Select placeholder="India" showSearch size="small">
+              <Select placeholder="India" showSearch>
                 <Select.Option value="India">India</Select.Option>
                 <Select.Option value="USA">USA</Select.Option>
                 <Select.Option value="UK">UK</Select.Option>
@@ -501,17 +495,16 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="City"
               name="city"
-              style={{ marginBottom: 10 }}
             >
-              <Input placeholder="" size="small" />
+              <Input placeholder="" />
             </Form.Item>
 
-            <Form.Item label="GSTIN" name="GSTIN" style={{ marginBottom: 10 }}>
-              <Input placeholder="" size="small" />
+            <Form.Item label="GSTIN" name="GSTIN">
+              <Input placeholder="" />
             </Form.Item>
 
-            <Form.Item label="Code" name="code" style={{ marginBottom: 10 }}>
-              <Input placeholder="" size="small" />
+            <Form.Item label="Code" name="code">
+              <Input placeholder="" />
             </Form.Item>
           </Col>
         </Row>
@@ -539,12 +532,12 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 <Form.Item
                   label="Source"
                   name="source_id"
-                  style={{ marginBottom: 10 }}
+                  labelCol={{ span: 9 }}
+                  wrapperCol={{ span: 15 }}
                 >
                   <Select
                     {...sourceSelectProps}
                     placeholder="Select"
-                    size="small"
                     allowClear
                     showSearch
                     filterOption={(input, option) =>
@@ -612,12 +605,12 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 <Form.Item
                   label="Since"
                   name="since"
-                  style={{ marginBottom: 10 }}
+                  labelCol={{ span: 10 }}
+                  wrapperCol={{ span: 14 }}
                 >
                   <DatePicker
                     style={{ width: "100%" }}
                     format="DD-MMM-YY"
-                    size="small"
                   />
                 </Form.Item>
               </Col>
@@ -626,12 +619,10 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Product"
               name="product_id"
-              style={{ marginBottom: 10 }}
             >
               <Select
                 {...productSelectProps}
                 placeholder=""
-                size="small"
                 allowClear
                 showSearch
                 filterOption={(input, option) =>
@@ -697,28 +688,24 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Potential (₹)"
               name="potential"
-              style={{ marginBottom: 10 }}
             >
               <InputNumber
                 style={{ width: "100%" }}
                 placeholder="0"
                 min={0}
                 precision={2}
-                size="small"
               />
             </Form.Item>
 
             <Form.Item
               label="Assigned to"
               name="assigned_user_id"
-              style={{ marginBottom: 10 }}
             >
               <Select
                 placeholder="Select a user"
                 loading={loadingUsers}
                 showSearch
                 optionFilterProp="label"
-                size="small"
                 allowClear
                 options={users.map((user) => ({
                   label: `${user.name}`,
@@ -731,22 +718,19 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               label="Stage"
               name="stage"
               rules={[{ required: true, message: "Required" }]}
-              style={{ marginBottom: 10 }}
             >
               <Select
                 placeholder="Select stage"
                 options={StageEnum}
-                size="small"
               />
             </Form.Item>
 
-            <Form.Item label="Tags" name="tags" style={{ marginBottom: 10 }}>
+            <Form.Item label="Tags" name="tags">
               <Select
                 {...tagSelectProps}
                 mode="multiple"
                 placeholder="Select or add tags"
                 style={{ width: "100%" }}
-                size="small"
                 allowClear
                 showSearch
                 filterOption={(input, option) =>
@@ -815,13 +799,12 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Requirement"
               name="requirements"
-              style={{ marginBottom: 10 }}
             >
-              <TextArea rows={3} placeholder="" style={{ fontSize: "13px" }} />
+              <TextArea rows={6} placeholder="" />
             </Form.Item>
 
-            <Form.Item label="Notes" name="notes" style={{ marginBottom: 10 }}>
-              <TextArea rows={3} placeholder="" style={{ fontSize: "13px" }} />
+            <Form.Item label="Notes" name="notes">
+              <TextArea rows={6} placeholder="" />
             </Form.Item>
           </Col>
         </Row>

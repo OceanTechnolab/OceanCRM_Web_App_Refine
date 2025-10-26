@@ -154,14 +154,6 @@ export const dataProvider: DataProvider = {
     const pageSize = (pagination as any)?.pageSize ?? 10;
     const mode = (pagination as any)?.mode ?? "server";
 
-    console.log("[DATA_PROVIDER] getList called with:", {
-      resource,
-      pagination: JSON.stringify(pagination),
-      currentPage,
-      pageSize,
-      mode,
-    });
-
     const query: {
       page?: number;
       page_size?: number;
@@ -197,8 +189,6 @@ export const dataProvider: DataProvider = {
         }
       });
     }
-
-    console.log("[DATA_PROVIDER] API query:", query);
 
     const { data } = await axiosInstance.get(
       `${url}?${stringify(query, { skipNull: true, skipEmptyString: true })}`,

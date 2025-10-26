@@ -53,8 +53,6 @@ export const LeadListPage = () => {
 
   const total = tableQuery?.data?.total || 0;
 
-  console.log("[LEAD_LIST] tableProps.pagination:", tableProps.pagination);
-
   return (
     <>
       <List
