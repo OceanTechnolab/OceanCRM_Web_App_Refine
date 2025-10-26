@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 
-import { useDelete, useNavigation } from "@refinedev/core";
+import { useDelete } from "@refinedev/core";
 
 import {
   ClockCircleOutlined,
@@ -14,6 +14,7 @@ import {
   Card,
   ConfigProvider,
   Dropdown,
+  Modal,
   Skeleton,
   Space,
   Tag,
@@ -47,7 +48,6 @@ export const ProjectCard = ({
   onCardClick,
 }: ProjectCardProps) => {
   const { token } = theme.useToken();
-  const { edit } = useNavigation();
   const { mutate } = useDelete();
 
   const dropdownItems = useMemo(() => {
@@ -57,7 +57,10 @@ export const ProjectCard = ({
         key: "1",
         icon: <EyeOutlined />,
         onClick: () => {
-          edit("tasks", id, "replace");
+          // Call onCardClick to open the modal
+          if (onCardClick) {
+            onCardClick();
+          }
         },
       },
       {
@@ -66,11 +69,17 @@ export const ProjectCard = ({
         key: "2",
         icon: <DeleteOutlined />,
         onClick: () => {
-          mutate({
-            resource: "tasks",
-            id,
-            meta: {
-              operation: "task",
+          Modal.confirm({
+            title: "Delete Lead",
+            content: "Are you sure you want to delete this lead?",
+            okText: "Delete",
+            cancelText: "Cancel",
+            okType: "danger",
+            onOk: () => {
+              mutate({
+                resource: "lead",
+                id,
+              });
             },
           });
         },
@@ -78,7 +87,7 @@ export const ProjectCard = ({
     ];
 
     return dropdownItems;
-  }, []);
+  }, [id, onCardClick, mutate]);
 
   const dueDateOptions = useMemo(() => {
     if (!dueDate) return null;
@@ -110,8 +119,6 @@ export const ProjectCard = ({
         onClick={() => {
           if (onCardClick) {
             onCardClick();
-          } else {
-            edit("tasks", id, "replace");
           }
         }}
         extra={

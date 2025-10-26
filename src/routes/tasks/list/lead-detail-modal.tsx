@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useUpdate, type HttpError } from "@refinedev/core";
 import { Form, Input, Modal, Select } from "antd";
 
 import { Text } from "@/components";
+import { userService } from "../../../services/user.service";
+import type { User } from "../../../interfaces/user";
 
 const { TextArea } = Input;
 
@@ -67,6 +69,8 @@ export const LeadDetailModal = ({
   lead,
 }: LeadDetailModalProps) => {
   const [form] = Form.useForm();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const { mutate: updateLead } = useUpdate<Lead, HttpError>({
     resource: "lead",
@@ -77,12 +81,32 @@ export const LeadDetailModal = ({
     },
   });
 
+  // Fetch users when modal opens
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!open) return;
+
+      setLoadingUsers(true);
+      try {
+        const fetchedUsers = await userService.getUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, [open]);
+
   useEffect(() => {
     if (open && lead) {
       form.setFieldsValue({
         business: lead.business.business,
         name: lead.business.name,
         stage: lead.stage,
+        assigned_user_id: lead.assigned_user?.id,
         requirements: lead.requirements,
         notes: lead.notes,
       });
@@ -99,7 +123,7 @@ export const LeadDetailModal = ({
           stage: values.stage,
           requirements: values.requirements,
           notes: values.notes,
-          assigned_to: lead.assigned_user?.id,
+          assigned_to: values.assigned_user_id || lead.assigned_user?.id,
           tags: lead.tags || [],
           source_id: lead.source?.id,
           product_id: lead.product?.id,
@@ -176,6 +200,24 @@ export const LeadDetailModal = ({
           <Select
             placeholder="Select stage"
             options={STAGE_OPTIONS}
+            style={{ width: "100%" }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Assigned to"
+          name="assigned_user_id"
+        >
+          <Select
+            placeholder="Select a user"
+            loading={loadingUsers}
+            showSearch
+            optionFilterProp="label"
+            allowClear
+            options={users.map((user) => ({
+              label: user.name,
+              value: user.id,
+            }))}
             style={{ width: "100%" }}
           />
         </Form.Item>
