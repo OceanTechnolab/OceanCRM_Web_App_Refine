@@ -16,8 +16,7 @@ import {
   CheckCircleOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
-import { useCreate } from "@refinedev/core";
-import { axiosInstance, API_URL } from "../../providers/data";
+import { useCustomMutation, useApiUrl } from "@refinedev/core";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -67,7 +66,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
   const [userName, setUserName] = useState<string | null>(null);
   const [allLeads, setAllLeads] = useState<any[]>([]);
 
-  const { mutate: createAccount } = useCreate();
+  const apiUrl = useApiUrl();
+
+  // Use Refine's useCustomMutation hook for custom API endpoint
+  const { mutate: connectMetaAccount } = useCustomMutation();
 
   // Fetch all leads for selected form (Testing Mode)
   const fetchLeadsForForm = async (formId: string, pageToken: string) => {
@@ -279,24 +281,42 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     try {
       // Note: x-org-id header is automatically added by Axios interceptor
 
-      // Make API call to backend using axios
-      const response = await axiosInstance.post(`${API_URL}/meta/account`, {
-        user_token: userToken,
-        page_id: selectedPage.id,
-        form_id: selectedFormId,
-      });
+      // Make API call to backend using Refine's useCustomMutation
+      connectMetaAccount(
+        {
+          url: `${apiUrl}/meta/account`,
+          method: "post",
+          values: {
+            user_token: userToken,
+            page_id: selectedPage.id,
+            form_id: selectedFormId,
+          },
+        },
+        {
+          onSuccess: (data: any) => {
+            console.log("✅ API Response:", data);
 
-      console.log("✅ API Response:", response.data);
+            // Show success toast notification with form name
+            if (data?.data?.form_name) {
+              message.success(`${data.data.form_name} added successfully!`, 5);
+            } else {
+              message.success("Facebook form connected successfully!", 5);
+            }
 
-      // Show success toast notification with form name
-      if (response.data.form_name) {
-        message.success(`${response.data.form_name} added successfully!`, 5);
-      } else {
-        message.success("Facebook form connected successfully!", 5);
-      }
-
-      // Move to success step
-      setCurrentStep(3);
+            // Move to success step
+            setCurrentStep(3);
+          },
+          onError: (err: any) => {
+            console.error("❌ API Error:", err);
+            setError(
+              err?.response?.data?.detail ||
+                err?.message ||
+                "Failed to connect Meta account",
+            );
+            setCurrentStep(0);
+          },
+        },
+      );
     } catch (err: any) {
       console.error("❌ Failed to connect:", err);
 
