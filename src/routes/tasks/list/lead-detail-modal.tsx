@@ -3,7 +3,7 @@ import { useUpdate, type HttpError } from "@refinedev/core";
 import { Form, Input, Modal, Select } from "antd";
 
 import { Text } from "@/components";
-import { userService } from "../../../services/user.service";
+import { useUsers } from "../../../services/user.service";
 import type { User } from "../../../interfaces/user";
 
 const { TextArea } = Input;
@@ -69,8 +69,13 @@ export const LeadDetailModal = ({
   lead,
 }: LeadDetailModalProps) => {
   const [form] = Form.useForm();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // **Use Refine hook for users - automatic caching and error handling**
+  const {
+    result: usersResult,
+    query: { isLoading: loadingUsers },
+  } = useUsers();
+  const users = usersResult?.data || [];
 
   const { mutate: updateLead } = useUpdate<Lead, HttpError>({
     resource: "lead",
@@ -80,25 +85,6 @@ export const LeadDetailModal = ({
       type: "success",
     },
   });
-
-  // Fetch users when modal opens
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!open) return;
-
-      setLoadingUsers(true);
-      try {
-        const fetchedUsers = await userService.getUsers();
-        setUsers(fetchedUsers);
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    fetchUsers();
-  }, [open]);
 
   useEffect(() => {
     if (open && lead) {
@@ -204,10 +190,7 @@ export const LeadDetailModal = ({
           />
         </Form.Item>
 
-        <Form.Item
-          label="Assigned to"
-          name="assigned_user_id"
-        >
+        <Form.Item label="Assigned to" name="assigned_user_id">
           <Select
             placeholder="Select a user"
             loading={loadingUsers}

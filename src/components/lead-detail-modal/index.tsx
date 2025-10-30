@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useOnError } from "@refinedev/core";
 import {
   Modal,
   Tabs,
@@ -42,9 +41,15 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
-import { interactionService } from "@/services/interaction.service";
-import { appointmentService } from "@/services/appointment.service";
-import { axiosInstance, API_URL } from "@/providers/data";
+import {
+  useInteractionsByLeadId,
+  useCreateInteraction,
+} from "@/services/interaction.service";
+import {
+  useAppointmentsByLeadId,
+  useCreateAppointment,
+} from "@/services/appointment.service";
+import { useUsers } from "@/services/user.service";
 import type { Interaction, InteractionType } from "@/interfaces/interaction";
 import type { Appointment, AppointmentType } from "@/interfaces/appointment";
 
@@ -88,20 +93,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
-  const [interactions, setInteractions] = useState<Interaction[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [interactionsLoading, setInteractionsLoading] = useState(false);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [usersLoading, setUsersLoading] = useState(false);
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [appointmentForm] = Form.useForm();
-
-  // Use Refine's useOnError hook to handle authentication errors
-  const { mutate: triggerOnError } = useOnError();
 
   // Use passed leadData directly instead of fetching
   const lead = leadData;
@@ -111,76 +106,39 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const currentUserId =
     localStorage.getItem("user_id") || lead?.assigned_user?.id;
 
-  // Fetch interactions when modal opens or leadId changes
-  useEffect(() => {
-    const fetchInteractions = async () => {
-      if (!leadId || !open) return;
+  // **Use Refine data hooks for automatic caching, error handling, and invalidation**
+  // Interactions - automatically fetched and cached
+  const {
+    result: interactionsData,
+    query: { isLoading: interactionsLoading },
+  } = useInteractionsByLeadId(open ? leadId || undefined : undefined);
+  const interactions = interactionsData?.data || [];
 
-      setInteractionsLoading(true);
-      try {
-        const data = await interactionService.getInteractionsByLeadId(leadId);
-        setInteractions(data);
-      } catch (error: any) {
-        console.error("Error fetching interactions:", error);
-        message.error(error.message || "Failed to load activities");
-      } finally {
-        setInteractionsLoading(false);
-      }
-    };
+  // Appointments - automatically fetched and cached
+  const {
+    result: appointmentsData,
+    query: { isLoading: appointmentsLoading },
+  } = useAppointmentsByLeadId(open ? leadId || undefined : undefined);
+  const appointments = appointmentsData?.data || [];
 
-    fetchInteractions();
-  }, [leadId, open]);
+  // Users - automatically fetched and cached (shared across all components)
+  const {
+    result: usersData,
+    query: { isLoading: usersLoading },
+  } = useUsers();
+  const users = usersData?.data || [];
 
-  // Fetch appointments when modal opens or leadId changes
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!leadId || !open) return;
+  // Create interaction mutation - automatic invalidation and notifications
+  const {
+    mutate: createInteraction,
+    mutation: { isPending: isCreatingInteraction },
+  } = useCreateInteraction();
 
-      setAppointmentsLoading(true);
-      try {
-        const data = await appointmentService.getAppointmentsByLeadId(leadId);
-        setAppointments(data);
-      } catch (error: any) {
-        console.error("Error fetching appointments:", error);
-        message.error(error.message || "Failed to load appointments");
-      } finally {
-        setAppointmentsLoading(false);
-      }
-    };
-
-    fetchAppointments();
-  }, [leadId, open]);
-
-  // Fetch users when modal opens
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!open) return;
-
-      setUsersLoading(true);
-      try {
-        // Note: x-org-id header is automatically added by Axios interceptor
-        const response = await axiosInstance.get(`${API_URL}/user`);
-
-        console.log("[USERS] Fetched users:", response.data);
-        setUsers(response.data);
-      } catch (error: any) {
-        console.error("Error fetching users:", error);
-
-        // Trigger Refine's error handling for authentication errors
-        // This will call authProvider.onError and handle logout if needed
-        triggerOnError(error);
-
-        // Only show user-facing error if it's not an auth error
-        if (error.statusCode !== 401 && error.statusCode !== 0) {
-          message.error(error.message || "Failed to load users");
-        }
-      } finally {
-        setUsersLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, [open, triggerOnError]);
+  // Create appointment mutation - automatic invalidation and notifications
+  const {
+    mutate: createAppointment,
+    mutation: { isPending: isCreatingAppointment },
+  } = useCreateAppointment();
 
   // Reset state when modal closes
   useEffect(() => {
@@ -193,65 +151,47 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     }
   }, [open, form, appointmentForm]);
 
-  const handleAddInteraction = async (values: any) => {
+  const handleAddInteraction = (values: any) => {
     if (!leadId) return;
 
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        lead_id: leadId,
-        note: values.note,
-        interaction_type: values.interaction_type,
-        interacted_at: values.interacted_at.toISOString(),
-      };
+    const payload = {
+      lead_id: leadId,
+      note: values.note,
+      interaction_type: values.interaction_type,
+      interacted_at: values.interacted_at.toISOString(),
+    };
 
-      const newInteraction =
-        await interactionService.createInteraction(payload);
-
-      // Add to the beginning of the interactions list
-      setInteractions([newInteraction, ...interactions]);
-
-      message.success("Activity logged successfully");
-      setIsAddingActivity(false);
-      form.resetFields();
-    } catch (error: any) {
-      console.error("Error creating interaction:", error);
-      // Use centralized error message from interceptor
-      message.error(error.message || "Failed to log activity");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createInteraction(
+      { values: payload },
+      {
+        onSuccess: () => {
+          setIsAddingActivity(false);
+          form.resetFields();
+        },
+      },
+    );
   };
 
-  const handleAddAppointment = async (values: any) => {
+  const handleAddAppointment = (values: any) => {
     if (!leadId) return;
 
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        lead_id: leadId,
-        note: values.note,
-        appointment_type: values.appointment_type,
-        scheduled_at: values.scheduled_at.toISOString(),
-        assigned_to: values.assigned_to,
-      };
+    const payload = {
+      lead_id: leadId,
+      note: values.note,
+      appointment_type: values.appointment_type,
+      scheduled_at: values.scheduled_at.toISOString(),
+      assigned_to: values.assigned_to,
+    };
 
-      const newAppointment =
-        await appointmentService.createAppointment(payload);
-
-      // Add to the beginning of the appointments list
-      setAppointments([newAppointment, ...appointments]);
-
-      message.success("Appointment scheduled successfully");
-      setIsAddingAppointment(false);
-      appointmentForm.resetFields();
-    } catch (error: any) {
-      console.error("Error creating appointment:", error);
-      // Use centralized error message from interceptor
-      message.error(error.message || "Failed to schedule appointment");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createAppointment(
+      { values: payload },
+      {
+        onSuccess: () => {
+          setIsAddingAppointment(false);
+          appointmentForm.resetFields();
+        },
+      },
+    );
   };
 
   const getStageColor = (stage: string) => {
@@ -613,7 +553,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <Button
                     type="primary"
                     htmlType="submit"
-                    loading={isSubmitting}
+                    loading={isCreatingInteraction}
                   >
                     Save Activity
                   </Button>
@@ -825,7 +765,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   <Button
                     type="primary"
                     htmlType="submit"
-                    loading={isSubmitting}
+                    loading={isCreatingAppointment}
                   >
                     Schedule Appointment
                   </Button>

@@ -16,7 +16,6 @@ import {
   Input,
   Select,
   DatePicker,
-  message,
 } from "antd";
 import {
   PhoneOutlined,
@@ -33,7 +32,10 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
-import { interactionService } from "@/services/interaction.service";
+import {
+  useInteractionsByLeadId,
+  useCreateInteraction,
+} from "@/services/interaction.service";
 import type { Interaction, InteractionType } from "@/interfaces/interaction";
 
 dayjs.extend(relativeTime);
@@ -64,7 +66,7 @@ const interactionColors: Record<string, string> = {
 export const LeadDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
+
   // Use Refine's useOne hook to fetch lead data
   const { query } = useOne({
     resource: "lead",
@@ -73,62 +75,44 @@ export const LeadDetailPage = () => {
       enabled: !!id,
     },
   });
-  
+
   const { data: leadData, isLoading: loading } = query;
   const lead = leadData?.data;
-  
-  const [interactions, setInteractions] = useState<Interaction[]>([]);
-  const [interactionsLoading, setInteractionsLoading] = useState(true);
+
+  // **Use Refine hooks - automatic caching and invalidation**
+  const {
+    result: interactionsData,
+    query: { isLoading: interactionsLoading },
+  } = useInteractionsByLeadId(id);
+  const interactions = interactionsData?.data || [];
+
+  const {
+    mutate: createInteraction,
+    mutation: { isPending: isSubmitting },
+  } = useCreateInteraction();
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form] = Form.useForm();
 
-  // Fetch interactions
-  useEffect(() => {
-    const fetchInteractions = async () => {
-      if (!id) return;
-
-      setInteractionsLoading(true);
-      try {
-        const data = await interactionService.getInteractionsByLeadId(id);
-        setInteractions(data);
-      } catch (error) {
-        console.error("Error fetching interactions:", error);
-        message.error("Failed to load activities");
-      } finally {
-        setInteractionsLoading(false);
-      }
-    };
-
-    fetchInteractions();
-  }, [id]);
-
-  const handleAddInteraction = async (values: any) => {
+  const handleAddInteraction = (values: any) => {
     if (!id) return;
 
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        lead_id: id,
-        note: values.note,
-        interaction_type: values.interaction_type,
-        interacted_at: values.interacted_at.toISOString(),
-      };
+    const payload = {
+      lead_id: id,
+      note: values.note,
+      interaction_type: values.interaction_type,
+      interacted_at: values.interacted_at.toISOString(),
+    };
 
-      const newInteraction = await interactionService.createInteraction(payload);
-      
-      // Add to the beginning of the interactions list
-      setInteractions([newInteraction, ...interactions]);
-      
-      message.success("Activity logged successfully");
-      setIsDrawerOpen(false);
-      form.resetFields();
-    } catch (error) {
-      console.error("Error creating interaction:", error);
-      message.error("Failed to log activity");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createInteraction(
+      { values: payload },
+      {
+        onSuccess: () => {
+          setIsDrawerOpen(false);
+          form.resetFields();
+        },
+      },
+    );
   };
 
   const getStageColor = (stage: string) => {
@@ -174,7 +158,13 @@ export const LeadDetailPage = () => {
         >
           Back to Leads
         </Button>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <CustomAvatar
               name={lead.business?.business || lead.business?.name}
@@ -185,7 +175,10 @@ export const LeadDetailPage = () => {
               <Title level={2} style={{ margin: 0 }}>
                 {lead.business?.business || lead.business?.name}
               </Title>
-              <Tag color={getStageColor(lead.stage)} style={{ marginTop: "8px" }}>
+              <Tag
+                color={getStageColor(lead.stage)}
+                style={{ marginTop: "8px" }}
+              >
                 {lead.stage}
               </Tag>
             </div>
@@ -280,9 +273,17 @@ export const LeadDetailPage = () => {
               color: interactionColors[interaction.interaction_type],
               children: (
                 <div style={{ paddingBottom: "16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "8px",
+                    }}
+                  >
                     <Space>
-                      <Tag color={interactionColors[interaction.interaction_type]}>
+                      <Tag
+                        color={interactionColors[interaction.interaction_type]}
+                      >
                         {interaction.interaction_type}
                       </Tag>
                       <Text strong>{interaction.interacted_by_user.name}</Text>
@@ -294,7 +295,9 @@ export const LeadDetailPage = () => {
                   <Text>{interaction.note}</Text>
                   <div style={{ marginTop: "4px" }}>
                     <Text type="secondary" style={{ fontSize: "12px" }}>
-                      {dayjs(interaction.interacted_at).format("MMM D, YYYY [at] h:mm A")}
+                      {dayjs(interaction.interacted_at).format(
+                        "MMM D, YYYY [at] h:mm A",
+                      )}
                     </Text>
                   </div>
                 </div>
@@ -334,10 +337,22 @@ export const LeadDetailPage = () => {
               options={[
                 { value: "Call", label: "Call", icon: <PhoneOutlined /> },
                 { value: "Meeting", label: "Meeting", icon: <TeamOutlined /> },
-                { value: "Online", label: "Online Meeting", icon: <VideoCameraOutlined /> },
+                {
+                  value: "Online",
+                  label: "Online Meeting",
+                  icon: <VideoCameraOutlined />,
+                },
                 { value: "Email", label: "Email", icon: <MailOutlined /> },
-                { value: "Message", label: "Message", icon: <MessageOutlined /> },
-                { value: "Other", label: "Other", icon: <ClockCircleOutlined /> },
+                {
+                  value: "Message",
+                  label: "Message",
+                  icon: <MessageOutlined />,
+                },
+                {
+                  value: "Other",
+                  label: "Other",
+                  icon: <ClockCircleOutlined />,
+                },
               ]}
             />
           </Form.Item>
@@ -358,9 +373,7 @@ export const LeadDetailPage = () => {
           <Form.Item
             name="note"
             label="Notes"
-            rules={[
-              { required: true, message: "Please enter activity notes" },
-            ]}
+            rules={[{ required: true, message: "Please enter activity notes" }]}
           >
             <TextArea
               rows={6}
@@ -372,10 +385,12 @@ export const LeadDetailPage = () => {
 
           <Form.Item>
             <Space style={{ width: "100%", justifyContent: "flex-end" }}>
-              <Button onClick={() => {
-                setIsDrawerOpen(false);
-                form.resetFields();
-              }}>
+              <Button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  form.resetFields();
+                }}
+              >
                 Cancel
               </Button>
               <Button type="primary" htmlType="submit" loading={isSubmitting}>

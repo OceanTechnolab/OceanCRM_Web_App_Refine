@@ -17,28 +17,6 @@ export const resources: IResourceItem[] = [
       icon: <DashboardOutlined />,
     },
   },
-  // Companies and Contacts are temporarily hidden
-  // {
-  //   name: "companies",
-  //   list: "/app/companies",
-  //   show: "/app/companies/:id",
-  //   create: "/app/companies/new",
-  //   edit: "/app/companies/edit/:id",
-  //   meta: {
-  //     label: "Companies",
-  //     icon: <ShopOutlined />,
-  //   },
-  // },
-  // {
-  //   name: "contacts",
-  //   list: "/app/contacts",
-  //   create: "/app/contacts/new",
-  //   edit: "/app/contacts/edit/:id",
-  //   meta: {
-  //     label: "Contacts",
-  //     icon: <TeamOutlined />,
-  //   },
-  // },
   {
     name: "lead",
     list: "/app/leads",
@@ -57,6 +35,25 @@ export const resources: IResourceItem[] = [
     meta: {
       label: "Tasks",
       icon: <ProjectOutlined />,
+    },
+  },
+  // Meta resources (not displayed in menu, but available for data hooks)
+  {
+    name: "user",
+    meta: {
+      hide: true, // Hide from menu
+    },
+  },
+  {
+    name: "interaction",
+    meta: {
+      hide: true, // Hide from menu
+    },
+  },
+  {
+    name: "appointment",
+    meta: {
+      hide: true, // Hide from menu
     },
   },
 ];
