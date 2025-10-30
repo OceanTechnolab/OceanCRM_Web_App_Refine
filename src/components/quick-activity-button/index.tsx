@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Dropdown, Modal, Form, Input, DatePicker, Select, message } from "antd";
+import { Button, Dropdown, Modal, Form, Input, DatePicker, Select } from "antd";
 import {
   PhoneOutlined,
   TeamOutlined,
@@ -10,7 +10,7 @@ import {
   DownOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { interactionService } from "@/services/interaction.service";
+import { useCreateInteraction } from "@/services/interaction.service";
 import type { InteractionType } from "@/interfaces/interaction";
 
 const { TextArea } = Input;
@@ -25,17 +25,49 @@ export const QuickActivityButton: React.FC<QuickActivityButtonProps> = ({
   onSuccess,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState<InteractionType | null>(null);
+  const [selectedType, setSelectedType] = useState<InteractionType | null>(
+    null,
+  );
   const [form] = Form.useForm();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // **Use Refine hook - automatic invalidation and notifications**
+  const {
+    mutate: createInteraction,
+    mutation: { isPending: isSubmitting },
+  } = useCreateInteraction();
 
   const activityTypes = [
     { key: "Call", label: "Log Call", icon: <PhoneOutlined />, value: "Call" },
-    { key: "Meeting", label: "Log Meeting", icon: <TeamOutlined />, value: "Meeting" },
-    { key: "Email", label: "Log Email", icon: <MailOutlined />, value: "Email" },
-    { key: "Message", label: "Log Message", icon: <MessageOutlined />, value: "Message" },
-    { key: "Online", label: "Log Online Meeting", icon: <GlobalOutlined />, value: "Online" },
-    { key: "Other", label: "Log Other", icon: <ClockCircleOutlined />, value: "Other" },
+    {
+      key: "Meeting",
+      label: "Log Meeting",
+      icon: <TeamOutlined />,
+      value: "Meeting",
+    },
+    {
+      key: "Email",
+      label: "Log Email",
+      icon: <MailOutlined />,
+      value: "Email",
+    },
+    {
+      key: "Message",
+      label: "Log Message",
+      icon: <MessageOutlined />,
+      value: "Message",
+    },
+    {
+      key: "Online",
+      label: "Log Online Meeting",
+      icon: <GlobalOutlined />,
+      value: "Online",
+    },
+    {
+      key: "Other",
+      label: "Log Other",
+      icon: <ClockCircleOutlined />,
+      value: "Other",
+    },
   ];
 
   const handleActivityClick = (type: InteractionType) => {
@@ -47,27 +79,24 @@ export const QuickActivityButton: React.FC<QuickActivityButtonProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async (values: any) => {
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        lead_id: leadId,
-        note: values.note,
-        interaction_type: values.interaction_type,
-        interacted_at: values.interacted_at.toISOString(),
-      };
+  const handleSubmit = (values: any) => {
+    const payload = {
+      lead_id: leadId,
+      note: values.note,
+      interaction_type: values.interaction_type,
+      interacted_at: values.interacted_at.toISOString(),
+    };
 
-      await interactionService.createInteraction(payload);
-      message.success(`${values.interaction_type} logged successfully`);
-      setIsModalOpen(false);
-      form.resetFields();
-      onSuccess?.();
-    } catch (error) {
-      console.error("Error logging activity:", error);
-      message.error("Failed to log activity");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createInteraction(
+      { values: payload },
+      {
+        onSuccess: () => {
+          setIsModalOpen(false);
+          form.resetFields();
+          onSuccess?.();
+        },
+      },
+    );
   };
 
   const getIcon = (type: InteractionType | null) => {
@@ -146,9 +175,7 @@ export const QuickActivityButton: React.FC<QuickActivityButtonProps> = ({
           <Form.Item
             name="note"
             label="Notes"
-            rules={[
-              { required: true, message: "Please enter notes" },
-            ]}
+            rules={[{ required: true, message: "Please enter notes" }]}
           >
             <TextArea
               rows={4}
@@ -159,11 +186,19 @@ export const QuickActivityButton: React.FC<QuickActivityButtonProps> = ({
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0 }}>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              <Button onClick={() => {
-                setIsModalOpen(false);
-                form.resetFields();
-              }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <Button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  form.resetFields();
+                }}
+              >
                 Cancel
               </Button>
               <Button type="primary" htmlType="submit" loading={isSubmitting}>

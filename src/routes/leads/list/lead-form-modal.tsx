@@ -17,7 +17,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import { useModalForm, useSelect } from "@refinedev/antd";
 import { useGetIdentity, useCreate } from "@refinedev/core";
 import dayjs from "dayjs";
-import { userService } from "../../../services/user.service";
+import { useUsers } from "../../../services/user.service";
 import type { User } from "../../../interfaces/user";
 
 const { TextArea } = Input;
@@ -63,9 +63,12 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
   // Store business ID for edit mode
   const [businessId, setBusinessId] = useState<string | undefined>();
 
-  // User selection state
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  // **Use Refine hook for users - automatic caching and error handling**
+  const {
+    result: usersResult,
+    query: { isLoading: loadingUsers },
+  } = useUsers();
+  const users = usersResult?.data || [];
 
   const { data: identity } = useGetIdentity<{ id: string }>();
   const { mutate: createProduct } = useCreate();
@@ -112,26 +115,6 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     pagination: { pageSize: 100 },
     queryOptions: { enabled: opened },
   });
-
-  // Fetch users when modal opens
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!opened) return;
-
-      setLoadingUsers(true);
-      try {
-        // Note: org_id is automatically added by Axios interceptor
-        const fetchedUsers = await userService.getUsers();
-        setUsers(fetchedUsers);
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    fetchUsers();
-  }, [opened]);
 
   // Set default values when creating new lead
   useEffect(() => {
@@ -221,8 +204,8 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
 
         // Strip +91 prefix from mobile number for editing
         const mobileNumber = business?.mobile || "";
-        const displayMobile = mobileNumber.startsWith("+91") 
-          ? mobileNumber.substring(3) 
+        const displayMobile = mobileNumber.startsWith("+91")
+          ? mobileNumber.substring(3)
           : mobileNumber;
 
         form.setFieldsValue({
@@ -259,16 +242,16 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     if (!values.contact_person && !values.email && !values.mobile) {
       form.setFields([
         {
-          name: 'contact_person',
-          errors: ['At least one of Name, Email, or Mobile is required'],
+          name: "contact_person",
+          errors: ["At least one of Name, Email, or Mobile is required"],
         },
         {
-          name: 'email',
-          errors: ['At least one of Name, Email, or Mobile is required'],
+          name: "email",
+          errors: ["At least one of Name, Email, or Mobile is required"],
         },
         {
-          name: 'mobile',
-          errors: ['At least one of Name, Email, or Mobile is required'],
+          name: "mobile",
+          errors: ["At least one of Name, Email, or Mobile is required"],
         },
       ]);
       return;
@@ -328,8 +311,8 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
 
       // Strip +91 prefix from mobile number for editing
       const mobileNumber = business?.mobile || "";
-      const displayMobile = mobileNumber.startsWith("+91") 
-        ? mobileNumber.substring(3) 
+      const displayMobile = mobileNumber.startsWith("+91")
+        ? mobileNumber.substring(3)
         : mobileNumber;
 
       form.setFieldsValue({
@@ -400,37 +383,28 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
         <Row gutter={16}>
           {/* Left Column */}
           <Col span={12}>
-            <Form.Item
-              label="Business"
-              name="business_name"
-            >
+            <Form.Item label="Business" name="business_name">
               <Input placeholder="" />
             </Form.Item>
 
             <Form.Item label="Name">
               <Input.Group compact>
-                <Form.Item
-                  name="title"
-                  noStyle
-                >
-                  <Select placeholder="Mr." allowClear style={{ width: '25%' }}>
+                <Form.Item name="title" noStyle>
+                  <Select placeholder="Mr." allowClear style={{ width: "25%" }}>
                     <Select.Option value="Mr.">Mr.</Select.Option>
                     <Select.Option value="Ms.">Ms.</Select.Option>
                   </Select>
                 </Form.Item>
-                <Form.Item
-                  name="contact_person"
-                  noStyle
-                >
-                  <Input placeholder="Contact Person Name" style={{ width: '75%' }} />
+                <Form.Item name="contact_person" noStyle>
+                  <Input
+                    placeholder="Contact Person Name"
+                    style={{ width: "75%" }}
+                  />
                 </Form.Item>
               </Input.Group>
             </Form.Item>
 
-            <Form.Item
-              label="Designation"
-              name="designation"
-            >
+            <Form.Item label="Designation" name="designation">
               <Input placeholder="" />
             </Form.Item>
 
@@ -450,41 +424,27 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             <Form.Item
               label="Email"
               name="email"
-              rules={[
-                { type: "email", message: "Invalid email" },
-              ]}
+              rules={[{ type: "email", message: "Invalid email" }]}
             >
               <Input placeholder="" />
             </Form.Item>
 
-            <Form.Item
-              label="Website"
-              name="website"
-            >
+            <Form.Item label="Website" name="website">
               <Input placeholder="" />
             </Form.Item>
           </Col>
 
           {/* Right Column */}
           <Col span={12}>
-            <Form.Item
-              label="Address"
-              name="address"
-            >
+            <Form.Item label="Address" name="address">
               <Input placeholder="Line 1" />
             </Form.Item>
 
-            <Form.Item
-              label=" "
-              name="address_line2"
-            >
+            <Form.Item label=" " name="address_line2">
               <Input placeholder="Line 2" />
             </Form.Item>
 
-            <Form.Item
-              label="Country"
-              name="country"
-            >
+            <Form.Item label="Country" name="country">
               <Select placeholder="India" showSearch>
                 <Select.Option value="India">India</Select.Option>
                 <Select.Option value="USA">USA</Select.Option>
@@ -492,10 +452,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               </Select>
             </Form.Item>
 
-            <Form.Item
-              label="City"
-              name="city"
-            >
+            <Form.Item label="City" name="city">
               <Input placeholder="" />
             </Form.Item>
 
@@ -608,18 +565,12 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                   labelCol={{ span: 10 }}
                   wrapperCol={{ span: 14 }}
                 >
-                  <DatePicker
-                    style={{ width: "100%" }}
-                    format="DD-MMM-YY"
-                  />
+                  <DatePicker style={{ width: "100%" }} format="DD-MMM-YY" />
                 </Form.Item>
               </Col>
             </Row>
 
-            <Form.Item
-              label="Product"
-              name="product_id"
-            >
+            <Form.Item label="Product" name="product_id">
               <Select
                 {...productSelectProps}
                 placeholder=""
@@ -685,10 +636,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               />
             </Form.Item>
 
-            <Form.Item
-              label="Potential (₹)"
-              name="potential"
-            >
+            <Form.Item label="Potential (₹)" name="potential">
               <InputNumber
                 style={{ width: "100%" }}
                 placeholder="0"
@@ -697,10 +645,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               />
             </Form.Item>
 
-            <Form.Item
-              label="Assigned to"
-              name="assigned_user_id"
-            >
+            <Form.Item label="Assigned to" name="assigned_user_id">
               <Select
                 placeholder="Select a user"
                 loading={loadingUsers}
@@ -719,10 +664,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
               name="stage"
               rules={[{ required: true, message: "Required" }]}
             >
-              <Select
-                placeholder="Select stage"
-                options={StageEnum}
-              />
+              <Select placeholder="Select stage" options={StageEnum} />
             </Form.Item>
 
             <Form.Item label="Tags" name="tags">
@@ -796,10 +738,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
 
           {/* Right Column */}
           <Col span={12}>
-            <Form.Item
-              label="Requirement"
-              name="requirements"
-            >
+            <Form.Item label="Requirement" name="requirements">
               <TextArea rows={6} placeholder="" />
             </Form.Item>
 

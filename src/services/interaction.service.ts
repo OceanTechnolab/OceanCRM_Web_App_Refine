@@ -1,34 +1,70 @@
+import { useList, useCreate, useInvalidate } from "@refinedev/core";
 import type {
   Interaction,
   CreateInteractionPayload,
 } from "../interfaces/interaction";
-import { axiosInstance, API_URL } from "../providers/data";
 
-export const interactionService = {
-  getInteractionsByLeadId: async (leadId: string): Promise<Interaction[]> => {
-    // Note: x-org-id header is automatically added by Axios interceptor
-    const response = await axiosInstance.get(
-      `${API_URL}/interaction?lead_id=${leadId}`,
-    );
+/**
+ * Custom hook to fetch interactions by lead ID using Refine's data hooks
+ * Benefits:
+ * - Automatic caching and deduplication
+ * - Automatic error handling via authProvider.onError
+ * - Loading and error states
+ * - Automatic cache invalidation on mutations
+ */
+export const useInteractionsByLeadId = (leadId: string | undefined) => {
+  return useList<Interaction>({
+    resource: "interaction",
+    filters: leadId
+      ? [
+          {
+            field: "lead_id",
+            operator: "eq",
+            value: leadId,
+          },
+        ]
+      : undefined,
+    sorters: [
+      {
+        field: "interacted_at",
+        order: "desc",
+      },
+    ],
+    queryOptions: {
+      enabled: !!leadId, // Only fetch if leadId is provided
+      staleTime: 30 * 1000, // Keep cache fresh for 30 seconds
+    },
+  });
+};
 
-    return response.data;
-  },
+/**
+ * Custom hook to create an interaction using Refine's data hooks
+ * Benefits:
+ * - Automatic cache invalidation
+ * - Optimistic updates support
+ * - Automatic error handling
+ */
+export const useCreateInteraction = () => {
+  const invalidate = useInvalidate();
 
-  createInteraction: async (
-    payload: CreateInteractionPayload,
-  ): Promise<Interaction> => {
-    console.log(
-      "[INTERACTION] Creating interaction with payload:",
-      JSON.stringify(payload, null, 2),
-    );
-
-    // Note: x-org-id header is automatically added by Axios interceptor
-    const response = await axiosInstance.post(
-      `${API_URL}/interaction`,
-      payload,
-    );
-
-    return response.data;
-    // Note: Errors are handled centrally by Axios interceptor
-  },
+  return useCreate<Interaction, any, CreateInteractionPayload>({
+    resource: "interaction",
+    successNotification: (data) => ({
+      message: "Activity logged successfully",
+      type: "success",
+    }),
+    errorNotification: (error) => ({
+      message: error?.message || "Failed to log activity",
+      type: "error",
+    }),
+    meta: {
+      onSuccess: () => {
+        // Invalidate interaction list cache to refetch
+        invalidate({
+          resource: "interaction",
+          invalidates: ["list"],
+        });
+      },
+    },
+  });
 };

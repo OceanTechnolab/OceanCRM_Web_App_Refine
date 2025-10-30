@@ -33,7 +33,6 @@ import {
   ContactListPage,
   DashboardPage,
   LeadListPage,
-  LeadDetailPage,
   LoginPage,
   TasksCreatePage,
   TasksEditPage,
@@ -130,22 +129,9 @@ const App = () => {
             <Route path="edit/:id" element={<TasksEditPage />} />
           </Route>
 
-          {/* Companies and Contacts pages are temporarily hidden */}
-          {/*
-                      <Route path="companies">
-                        <Route index element={<CompanyListPage />} />
-                        <Route path="new" element={<CompanyCreatePage />} />
-                        <Route path="edit/:id" element={<CompanyEditPage />} />
-                      </Route>
-
-                      <Route path="contacts">
-                        <Route index element={<ContactListPage />} />
-                      </Route>
-                      */}
-
           <Route path="leads">
             <Route index element={<LeadListPage />} />
-            <Route path="detail/:id" element={<LeadDetailPage />} />
+            {/* View is now handled via modal in LeadListPage */}
           </Route>
 
           <Route path="*" element={<ErrorComponent />} />

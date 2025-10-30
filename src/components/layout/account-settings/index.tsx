@@ -1,18 +1,14 @@
 import { useState, useEffect } from "react";
-import { useLogout } from "@refinedev/core";
+import { useLogout, useUpdate, useInvalidate } from "@refinedev/core";
 
 import { CloseOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
 
-import { axiosInstance, API_URL } from "@/providers/data";
 import { getNameInitials } from "@/utilities";
+import { useLoggedUser } from "@/services/user.service";
 
 import { CustomAvatar } from "../../custom-avatar";
 import { Text } from "../../text";
-
-// Better default avatar - using a professional style
-const DEFAULT_AVATAR =
-  "https://api.dicebear.com/7.x/initials/svg?seed=Default&backgroundColor=1677ff";
 
 type Props = {
   opened: boolean;
@@ -20,90 +16,75 @@ type Props = {
   userId: string;
 };
 
-type UserData = {
-  id: string;
-  name: string;
-  email: string;
-  mobile?: string;
-  avatarUrl?: string;
-};
-
 export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const [form] = Form.useForm();
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
   const { mutate: logout } = useLogout();
+  const invalidate = useInvalidate();
+
+  // Use the service hook to fetch logged user data
+  const { data: userData, isLoading, error, refetch } = useLoggedUser();
+
+  // Use Refine's useUpdate hook for updating user data
+  const { mutate: updateUser } = useUpdate();
 
   useEffect(() => {
     if (opened && userId) {
-      fetchUserData();
+      // Refetch when drawer opens to ensure fresh data
+      refetch();
     }
   }, [opened, userId]);
 
-  const fetchUserData = async () => {
-    setIsLoading(true);
-    try {
-      const response = await axiosInstance.get(`${API_URL}/user/logged`);
-
-      const data = response.data;
-      const user: UserData = {
-        id: data.id,
-        name: data.name || data.email,
-        email: data.email,
-        mobile: data.mobile,
-        avatarUrl: data.avatar_url,
-      };
-
-      setUserData(user);
+  useEffect(() => {
+    // Update form when user data is loaded
+    if (userData) {
       form.setFieldsValue({
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
+        name: userData.name,
+        email: userData.email,
+        mobile: userData.mobile,
       });
-    } catch (error: any) {
+    }
+  }, [userData, form]);
+
+  useEffect(() => {
+    // Handle errors
+    if (error) {
       console.error("Error fetching user data:", error);
-      
-      // Check if it's an authentication error (handled by interceptor)
-      if (error.name === "AuthenticationError") {
-        message.error(error.message);
-        logout();
-        return;
-      }
-      
-      // Use centralized error message
-      message.error(error.message || "Failed to load user data");
-    } finally {
-      setIsLoading(false);
+      message.error("Failed to load user data");
     }
-  };
+  }, [error]);
 
-  const handleSave = async (values: any) => {
+  const handleSave = (values: any) => {
     setIsSaving(true);
-    try {
-      const response = await axiosInstance.put(`${API_URL}/user/${userId}`, {
-        name: values.name,
-        email: values.email,
-        mobile: values.mobile,
-      });
-
-      message.success("Account settings updated successfully");
-      setOpened(false);
-    } catch (error: any) {
-      console.error("Error updating user data:", error);
-      
-      // Check if it's an authentication error
-      if (error.name === "AuthenticationError") {
-        message.error(error.message);
-        logout();
-        return;
-      }
-      
-      // Use centralized error message
-      message.error(error.message || "Failed to update account settings");
-    } finally {
-      setIsSaving(false);
-    }
+    updateUser(
+      {
+        resource: "user",
+        id: userId,
+        values: {
+          name: values.name,
+          email: values.email,
+          mobile: values.mobile,
+        },
+      },
+      {
+        onSuccess: () => {
+          message.success("Account settings updated successfully");
+          // Invalidate logged user cache to refresh data
+          invalidate({
+            resource: "user",
+            invalidates: ["list"],
+          });
+          refetch(); // Refresh the logged user data
+          setOpened(false);
+          setIsSaving(false);
+        },
+        onError: (error: any) => {
+          console.error("Error updating user data:", error);
+          message.error(error.message || "Failed to update account settings");
+          setIsSaving(false);
+        },
+      },
+    );
   };
 
   const closeModal = () => {
@@ -165,15 +146,24 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
         }}
       >
         <Card>
-          <Avatar
-            size={96}
-            icon={<UserOutlined />}
-            style={{
-              backgroundColor: "#1677ff",
-              marginBottom: "24px",
-              fontSize: "48px",
-            }}
-          />
+          {userData?.avatar_url ? (
+            <Avatar
+              size={96}
+              src={userData.avatar_url}
+              style={{
+                marginBottom: "24px",
+              }}
+            />
+          ) : (
+            <CustomAvatar
+              name={userData?.name || userData?.email || "User"}
+              size={96}
+              style={{
+                marginBottom: "24px",
+                fontSize: "48px",
+              }}
+            />
+          )}
           <Form form={form} layout="vertical" onFinish={handleSave}>
             <Form.Item
               label="Name"

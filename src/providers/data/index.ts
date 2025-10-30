@@ -304,6 +304,7 @@ export const dataProvider: DataProvider = {
         page_size?: number;
         q?: string;
         assigned_user_id?: string;
+        lead_id?: string;
       } = {};
 
       if (mode === "server") {
@@ -330,6 +331,10 @@ export const dataProvider: DataProvider = {
               } else {
                 query.assigned_user_id = filter.value;
               }
+            }
+            // Handle lead_id filter for interactions and appointments
+            else if (filter.field === "lead_id") {
+              query.lead_id = filter.value;
             }
           }
         });
