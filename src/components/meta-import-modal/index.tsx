@@ -27,7 +27,7 @@ declare global {
     FB?: {
       login: (
         callback: (response: any) => void,
-        options?: { scope: string }
+        options?: { scope: string },
       ) => void;
     };
   }
@@ -72,10 +72,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
   // Fetch all leads for selected form (Testing Mode)
   const fetchLeadsForForm = async (formId: string, pageToken: string) => {
     console.log("🔍 Fetching leads for form:", formId);
-    
+
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v24.0/${formId}/leads?access_token=${pageToken}`
+        `https://graph.facebook.com/v24.0/${formId}/leads?access_token=${pageToken}`,
       );
       const data = await response.json();
 
@@ -89,11 +89,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         setAllLeads(data.data);
         console.log(`✅ Found ${data.data.length} leads`);
         return data.data;
-      } else {
-        setAllLeads([]);
-        console.log("⚠️ No leads found for this form");
-        return [];
       }
+      setAllLeads([]);
+      console.log("⚠️ No leads found for this form");
+      return [];
     } catch (err: any) {
       console.error("❌ Failed to fetch leads:", err);
       setError(err.message || "Failed to fetch leads.");
@@ -139,8 +138,9 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       {
         // Full permissions for production (requires App Review approval)
         // For testing: Use only "email" until permissions are approved
-        scope: "email,ads_management,business_management,leads_retrieval,pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata",
-      }
+        scope:
+          "email,ads_management,business_management,leads_retrieval,pages_show_list,pages_read_engagement,pages_manage_ads,pages_manage_metadata",
+      },
     );
   };
 
@@ -151,7 +151,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v24.0/me?fields=id,name,email&access_token=${token}`
+        `https://graph.facebook.com/v24.0/me?fields=id,name,email&access_token=${token}`,
       );
       const data = await response.json();
 
@@ -165,7 +165,9 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         // After getting user info, fetch pages
         fetchPages(token);
       } else {
-        setError("Could not retrieve email. Please make sure email permission is granted.");
+        setError(
+          "Could not retrieve email. Please make sure email permission is granted.",
+        );
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch user information.");
@@ -181,7 +183,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token&access_token=${token}`
+        `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token&access_token=${token}`,
       );
       const data = await response.json();
 
@@ -193,7 +195,9 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
         setPages(data.data);
         setCurrentStep(1);
       } else {
-        setError("No Facebook pages found. Please make sure you manage at least one page.");
+        setError(
+          "No Facebook pages found. Please make sure you manage at least one page.",
+        );
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch Facebook pages.");
@@ -211,7 +215,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     console.log("📄 Page Details:", {
       id: page.id,
       name: page.name,
-      has_token: !!page.access_token
+      has_token: !!page.access_token,
     });
 
     setSelectedPage(page);
@@ -223,7 +227,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v24.0/${pageId}/leadgen_forms?access_token=${page.access_token}`
+        `https://graph.facebook.com/v24.0/${pageId}/leadgen_forms?access_token=${page.access_token}`,
       );
       const data = await response.json();
 
@@ -236,9 +240,14 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       if (data.data && data.data.length > 0) {
         setForms(data.data);
         setCurrentStep(2);
-        console.log(`✅ Found ${data.data.length} forms:`, data.data.map((f: any) => ({ id: f.id, name: f.name })));
+        console.log(
+          `✅ Found ${data.data.length} forms:`,
+          data.data.map((f: any) => ({ id: f.id, name: f.name })),
+        );
       } else {
-        setError("No lead forms found for this page. Please create a lead generation form first.");
+        setError(
+          "No lead forms found for this page. Please create a lead generation form first.",
+        );
         console.warn("⚠️ No forms found for this page");
       }
     } catch (err: any) {
@@ -261,7 +270,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
       page_id: selectedPage.id,
       page_name: selectedPage.name,
       form_id: selectedFormId,
-      form_name: forms.find(f => f.id === selectedFormId)?.name,
+      form_name: forms.find((f) => f.id === selectedFormId)?.name,
       user_token: userToken,
       user_email: userEmail,
       user_name: userName,
@@ -269,16 +278,13 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
     try {
       // Note: x-org-id header is automatically added by Axios interceptor
-      
+
       // Make API call to backend using axios
-      const response = await axiosInstance.post(
-        `${API_URL}/meta/account`,
-        {
-          user_token: userToken,
-          page_id: selectedPage.id,
-          form_id: selectedFormId,
-        },
-      );
+      const response = await axiosInstance.post(`${API_URL}/meta/account`, {
+        user_token: userToken,
+        page_id: selectedPage.id,
+        form_id: selectedFormId,
+      });
 
       console.log("✅ API Response:", response.data);
 
@@ -291,13 +297,14 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
       // Move to success step
       setCurrentStep(3);
-
     } catch (err: any) {
       console.error("❌ Failed to connect:", err);
-      
+
       // Use centralized error message from interceptor
       setError(err.message || "Failed to connect. Please try again.");
-      message.error(err.message || "Failed to connect to CRM. Please try again.");
+      message.error(
+        err.message || "Failed to connect to CRM. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -313,7 +320,7 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
     console.log("=== TESTING MODE: Show All Leads ===");
     console.log("📋 Request Details:", {
       form_id: selectedFormId,
-      form_name: forms.find(f => f.id === selectedFormId)?.name,
+      form_name: forms.find((f) => f.id === selectedFormId)?.name,
       page_id: selectedPage.id,
       page_name: selectedPage.name,
     });
@@ -400,7 +407,8 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {currentStep === 0 && (
               <div style={{ textAlign: "center" }}>
                 <Paragraph>
-                  Sign in with Facebook to import leads from your Facebook Lead Ads.
+                  Sign in with Facebook to import leads from your Facebook Lead
+                  Ads.
                 </Paragraph>
                 <Alert
                   message="Testing Mode"
@@ -429,13 +437,17 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {/* Step 1: Select Facebook Page */}
             {currentStep === 1 && (
               <div>
-                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                <Space
+                  direction="vertical"
+                  size="middle"
+                  style={{ width: "100%" }}
+                >
                   <div>
                     <Text strong>Welcome, {userName}!</Text>
                     <br />
                     <Text type="secondary">{userEmail}</Text>
                   </div>
-                  
+
                   <Paragraph>
                     Select the Facebook Page you want to import leads from:
                   </Paragraph>
@@ -474,13 +486,23 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
             {/* Step 2: Select Lead Form */}
             {currentStep === 2 && (
               <div>
-                <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Space
+                  direction="vertical"
+                  size="middle"
+                  style={{ width: "100%" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <div>
                       <Text strong>Page Selected:</Text> {selectedPage?.name}
                     </div>
-                    <Button 
-                      type="link" 
+                    <Button
+                      type="link"
                       onClick={handleBackToPageSelection}
                       size="small"
                     >
@@ -512,30 +534,32 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                           value: form.id,
                         }))}
                       />
-                      
+
                       {/* Show all leads section */}
                       {allLeads.length > 0 && (
-                        <div style={{ 
-                          marginTop: 20, 
-                          padding: 16, 
-                          background: "#f5f5f5", 
-                          borderRadius: 8,
-                          maxHeight: 300,
-                          overflowY: "auto"
-                        }}>
+                        <div
+                          style={{
+                            marginTop: 20,
+                            padding: 16,
+                            background: "#f5f5f5",
+                            borderRadius: 8,
+                            maxHeight: 300,
+                            overflowY: "auto",
+                          }}
+                        >
                           <Text strong style={{ fontSize: 16 }}>
                             Available Leads ({allLeads.length})
                           </Text>
                           <div style={{ marginTop: 12 }}>
                             {allLeads.map((lead, index) => (
-                              <div 
-                                key={lead.id} 
-                                style={{ 
-                                  padding: 12, 
-                                  background: "white", 
-                                  marginBottom: 8, 
+                              <div
+                                key={lead.id}
+                                style={{
+                                  padding: 12,
+                                  background: "white",
+                                  marginBottom: 8,
                                   borderRadius: 4,
-                                  border: "1px solid #d9d9d9"
+                                  border: "1px solid #d9d9d9",
                                 }}
                               >
                                 <Text strong>Lead #{index + 1}</Text>
@@ -545,13 +569,18 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                                 </Text>
                                 <br />
                                 <Text type="secondary" style={{ fontSize: 12 }}>
-                                  Created: {new Date(lead.created_time).toLocaleString()}
+                                  Created:{" "}
+                                  {new Date(lead.created_time).toLocaleString()}
                                 </Text>
                                 {lead.field_data && (
                                   <div style={{ marginTop: 8 }}>
                                     {lead.field_data.map((field: any) => (
-                                      <div key={field.name} style={{ fontSize: 12 }}>
-                                        <Text strong>{field.name}:</Text> {field.values.join(", ")}
+                                      <div
+                                        key={field.name}
+                                        style={{ fontSize: 12 }}
+                                      >
+                                        <Text strong>{field.name}:</Text>{" "}
+                                        {field.values.join(", ")}
                                       </div>
                                     ))}
                                   </div>
@@ -562,7 +591,10 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                         </div>
                       )}
 
-                      <Space style={{ width: "100%", marginTop: 16 }} direction="vertical">
+                      <Space
+                        style={{ width: "100%", marginTop: 16 }}
+                        direction="vertical"
+                      >
                         <Button
                           type="default"
                           size="large"
@@ -571,7 +603,9 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
                           loading={loading}
                           style={{ width: "100%" }}
                         >
-                          {allLeads.length > 0 ? "Refresh Leads" : "Next: Show All Leads"}
+                          {allLeads.length > 0
+                            ? "Refresh Leads"
+                            : "Next: Show All Leads"}
                         </Button>
                         <Button
                           type="primary"
@@ -610,28 +644,24 @@ export const MetaImportModal: React.FC<MetaImportModalProps> = ({
 
           {/* Footer Actions */}
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Button 
-              onClick={handleClose} 
-              disabled={loading} 
-              size="large"
-            >
+            <Button onClick={handleClose} disabled={loading} size="large">
               {currentStep === 3 ? "Close" : "Cancel"}
             </Button>
-            
+
             {currentStep === 1 && pages.length === 0 && !loading && (
-              <Button 
-                type="link" 
-                href="https://www.facebook.com/pages/create" 
+              <Button
+                type="link"
+                href="https://www.facebook.com/pages/create"
                 target="_blank"
               >
                 Create a Facebook Page
               </Button>
             )}
-            
+
             {currentStep === 2 && forms.length === 0 && !loading && (
-              <Button 
-                type="link" 
-                href="https://www.facebook.com/business/tools/ads-manager" 
+              <Button
+                type="link"
+                href="https://www.facebook.com/business/tools/ads-manager"
                 target="_blank"
               >
                 Create Lead Ads

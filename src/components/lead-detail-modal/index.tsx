@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useOnError } from "@refinedev/core";
 import {
   Modal,
   Tabs,
@@ -75,7 +76,7 @@ const interactionColors: Record<string, string> = {
 
 interface LeadDetailModalProps {
   leadId: string | null;
-  leadData: any | null;  // Pass lead data from grid
+  leadData: any | null; // Pass lead data from grid
   open: boolean;
   onClose: () => void;
 }
@@ -99,12 +100,16 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [form] = Form.useForm();
   const [appointmentForm] = Form.useForm();
 
+  // Use Refine's useOnError hook to handle authentication errors
+  const { mutate: triggerOnError } = useOnError();
+
   // Use passed leadData directly instead of fetching
   const lead = leadData;
   const loading = false; // No loading since we have data from grid
 
   // Get current user ID from localStorage
-  const currentUserId = localStorage.getItem('user_id') || lead?.assigned_user?.id;
+  const currentUserId =
+    localStorage.getItem("user_id") || lead?.assigned_user?.id;
 
   // Fetch interactions when modal opens or leadId changes
   useEffect(() => {
@@ -156,19 +161,26 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         // Note: x-org-id header is automatically added by Axios interceptor
         const response = await axiosInstance.get(`${API_URL}/user`);
 
-        console.log('[USERS] Fetched users:', response.data);
+        console.log("[USERS] Fetched users:", response.data);
         setUsers(response.data);
       } catch (error: any) {
         console.error("Error fetching users:", error);
-        // Use centralized error message
-        message.error(error.message || "Failed to load users");
+
+        // Trigger Refine's error handling for authentication errors
+        // This will call authProvider.onError and handle logout if needed
+        triggerOnError(error);
+
+        // Only show user-facing error if it's not an auth error
+        if (error.statusCode !== 401 && error.statusCode !== 0) {
+          message.error(error.message || "Failed to load users");
+        }
       } finally {
         setUsersLoading(false);
       }
     };
 
     fetchUsers();
-  }, [open]);
+  }, [open, triggerOnError]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -193,7 +205,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         interacted_at: values.interacted_at.toISOString(),
       };
 
-      const newInteraction = await interactionService.createInteraction(payload);
+      const newInteraction =
+        await interactionService.createInteraction(payload);
 
       // Add to the beginning of the interactions list
       setInteractions([newInteraction, ...interactions]);
@@ -223,7 +236,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         assigned_to: values.assigned_to,
       };
 
-      const newAppointment = await appointmentService.createAppointment(payload);
+      const newAppointment =
+        await appointmentService.createAppointment(payload);
 
       // Add to the beginning of the appointments list
       setAppointments([newAppointment, ...appointments]);
@@ -281,7 +295,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               {lead.business?.name || "-"}
             </Descriptions.Item>
             <Descriptions.Item label="Mobile">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Space>
                   <PhoneOutlined />
                   <Text>{lead.business?.mobile || "-"}</Text>
@@ -293,8 +313,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       size="small"
                       icon={<WhatsAppOutlined style={{ color: "#25D366" }} />}
                       onClick={() => {
-                        const phone = lead.business?.mobile?.replace(/\D/g, '');
-                        window.open(`https://wa.me/${phone}`, '_blank');
+                        const phone = lead.business?.mobile?.replace(/\D/g, "");
+                        window.open(`https://wa.me/${phone}`, "_blank");
                       }}
                     />
                     <Button
@@ -310,8 +330,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={() => {
-                        navigator.clipboard.writeText(lead.business?.mobile || '');
-                        message.success('Mobile number copied!');
+                        navigator.clipboard.writeText(
+                          lead.business?.mobile || "",
+                        );
+                        message.success("Mobile number copied!");
                       }}
                     />
                   </Space>
@@ -319,7 +341,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </div>
             </Descriptions.Item>
             <Descriptions.Item label="Email">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Space>
                   <MailOutlined />
                   <Text>{lead.business?.email || "-"}</Text>
@@ -339,8 +367,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={() => {
-                        navigator.clipboard.writeText(lead.business?.email || '');
-                        message.success('Email copied!');
+                        navigator.clipboard.writeText(
+                          lead.business?.email || "",
+                        );
+                        message.success("Email copied!");
                       }}
                     />
                   </Space>
@@ -366,14 +396,16 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <Text strong>{lead.source?.name || "UNKNOWN"}</Text>
             </div>
           )}
-          
+
           {(lead.notes || lead.requirements) && (
-            <div style={{ 
-              padding: "12px", 
-              background: "#f5f5f5", 
-              borderRadius: "4px",
-              marginBottom: 12 
-            }}>
+            <div
+              style={{
+                padding: "12px",
+                background: "#f5f5f5",
+                borderRadius: "4px",
+                marginBottom: 12,
+              }}
+            >
               <Text type="secondary">Notes: </Text>
               <Text>{lead.notes || lead.requirements || "-"}</Text>
             </div>
@@ -402,7 +434,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 <Title level={5} style={{ margin: 0 }}>
                   {lead.business?.business || lead.business?.name}
                 </Title>
-                <Text type="secondary">{lead.business?.title || lead.business?.designation}</Text>
+                <Text type="secondary">
+                  {lead.business?.title || lead.business?.designation}
+                </Text>
               </div>
             </Space>
           }
@@ -411,8 +445,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
           <Descriptions column={2} size="small">
             <Descriptions.Item label="Potential">
               <Space>
-                <DollarOutlined />
-                ₹{lead.potential?.toLocaleString() || "0"}
+                <DollarOutlined />₹{lead.potential?.toLocaleString() || "0"}
               </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Product">
@@ -421,10 +454,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             <Descriptions.Item label="Assigned To">
               {lead.assigned_user ? (
                 <Space>
-                  <CustomAvatar
-                    name={lead.assigned_user.name}
-                    size="small"
-                  />
+                  <CustomAvatar name={lead.assigned_user.name} size="small" />
                   {lead.assigned_user.name}
                 </Space>
               ) : (
@@ -443,7 +473,11 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 <Descriptions.Item label="Website">
                   <Space>
                     <GlobalOutlined />
-                    <a href={lead.business.website} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={lead.business.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       {lead.business.website}
                     </a>
                   </Space>
@@ -452,7 +486,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             </>
           )}
 
-          {(lead.business?.address_line_1 || lead.business?.city || lead.business?.country) && (
+          {(lead.business?.address_line_1 ||
+            lead.business?.city ||
+            lead.business?.country) && (
             <>
               <Divider style={{ margin: "12px 0" }} />
               <Descriptions column={1} size="small">
@@ -502,17 +538,35 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <Form.Item
                 name="interaction_type"
                 label="Activity Type"
-                rules={[{ required: true, message: "Please select activity type" }]}
+                rules={[
+                  { required: true, message: "Please select activity type" },
+                ]}
               >
                 <Select
                   placeholder="Select activity type"
                   options={[
                     { value: "Call", label: "Call", icon: <PhoneOutlined /> },
-                    { value: "Meeting", label: "Meeting", icon: <TeamOutlined /> },
-                    { value: "Online", label: "Online Meeting", icon: <VideoCameraOutlined /> },
+                    {
+                      value: "Meeting",
+                      label: "Meeting",
+                      icon: <TeamOutlined />,
+                    },
+                    {
+                      value: "Online",
+                      label: "Online Meeting",
+                      icon: <VideoCameraOutlined />,
+                    },
                     { value: "Email", label: "Email", icon: <MailOutlined /> },
-                    { value: "Message", label: "Message", icon: <MessageOutlined /> },
-                    { value: "Other", label: "Other", icon: <ClockCircleOutlined /> },
+                    {
+                      value: "Message",
+                      label: "Message",
+                      icon: <MessageOutlined />,
+                    },
+                    {
+                      value: "Other",
+                      label: "Other",
+                      icon: <ClockCircleOutlined />,
+                    },
                   ]}
                 />
               </Form.Item>
@@ -520,7 +574,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <Form.Item
                 name="interacted_at"
                 label="Date & Time"
-                rules={[{ required: true, message: "Please select date and time" }]}
+                rules={[
+                  { required: true, message: "Please select date and time" },
+                ]}
               >
                 <DatePicker
                   showTime
@@ -554,7 +610,11 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   >
                     Cancel
                   </Button>
-                  <Button type="primary" htmlType="submit" loading={isSubmitting}>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isSubmitting}
+                  >
                     Save Activity
                   </Button>
                 </Space>
@@ -589,10 +649,16 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       }}
                     >
                       <Space>
-                        <Tag color={interactionColors[interaction.interaction_type]}>
+                        <Tag
+                          color={
+                            interactionColors[interaction.interaction_type]
+                          }
+                        >
                           {interaction.interaction_type}
                         </Tag>
-                        <Text strong>{interaction.interacted_by_user?.name}</Text>
+                        <Text strong>
+                          {interaction.interacted_by_user?.name}
+                        </Text>
                       </Space>
                       <Text type="secondary">
                         {dayjs(interaction.interacted_at).fromNow()}
@@ -602,7 +668,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     <div style={{ marginTop: "4px" }}>
                       <Text type="secondary" style={{ fontSize: "12px" }}>
                         {dayjs(interaction.interacted_at).format(
-                          "MMM D, YYYY [at] h:mm A"
+                          "MMM D, YYYY [at] h:mm A",
                         )}
                       </Text>
                     </div>
@@ -632,31 +698,53 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
         {/* Appointment Form */}
         {isAddingAppointment && (
-          <Card size="small" style={{ marginBottom: 16 }} title="New Appointment">
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title="New Appointment"
+          >
             <Form
               form={appointmentForm}
               layout="vertical"
               onFinish={handleAddAppointment}
               initialValues={{
-                scheduled_at: dayjs().add(1, 'day').hour(10).minute(0),
+                scheduled_at: dayjs().add(1, "day").hour(10).minute(0),
                 assigned_to: currentUserId,
               }}
             >
               <Form.Item
                 name="appointment_type"
                 label="Appointment Type"
-                rules={[{ required: true, message: "Please select appointment type" }]}
+                rules={[
+                  { required: true, message: "Please select appointment type" },
+                ]}
               >
                 <Select
                   size="large"
                   placeholder="Select appointment type"
                   options={[
                     { value: "Call", label: "Call", icon: <PhoneOutlined /> },
-                    { value: "Meeting", label: "Meeting", icon: <TeamOutlined /> },
-                    { value: "Online", label: "Online Meeting", icon: <VideoCameraOutlined /> },
+                    {
+                      value: "Meeting",
+                      label: "Meeting",
+                      icon: <TeamOutlined />,
+                    },
+                    {
+                      value: "Online",
+                      label: "Online Meeting",
+                      icon: <VideoCameraOutlined />,
+                    },
                     { value: "Email", label: "Email", icon: <MailOutlined /> },
-                    { value: "Message", label: "Message", icon: <MessageOutlined /> },
-                    { value: "Other", label: "Other", icon: <ClockCircleOutlined /> },
+                    {
+                      value: "Message",
+                      label: "Message",
+                      icon: <MessageOutlined />,
+                    },
+                    {
+                      value: "Other",
+                      label: "Other",
+                      icon: <ClockCircleOutlined />,
+                    },
                   ]}
                 />
               </Form.Item>
@@ -664,7 +752,9 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <Form.Item
                 name="scheduled_at"
                 label="Schedule Date & Time"
-                rules={[{ required: true, message: "Please select date and time" }]}
+                rules={[
+                  { required: true, message: "Please select date and time" },
+                ]}
               >
                 <DatePicker
                   showTime
@@ -672,7 +762,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   style={{ width: "100%" }}
                   size="large"
                   disabledDate={(current) => {
-                    return current && current < dayjs().startOf('day');
+                    return current && current < dayjs().startOf("day");
                   }}
                 />
               </Form.Item>
@@ -689,19 +779,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   showSearch
                   optionFilterProp="children"
                   filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    (option?.label ?? "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
                   }
-                  options={users.map(user => ({
+                  options={users.map((user) => ({
                     value: user.id,
                     label: user.name,
                     user: user,
                   }))}
                   optionRender={(option) => (
                     <Space>
-                      <CustomAvatar
-                        name={option.data.user.name}
-                        size="small"
-                      />
+                      <CustomAvatar name={option.data.user.name} size="small" />
                       <span>{option.data.user.name}</span>
                     </Space>
                   )}
@@ -733,7 +822,11 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   >
                     Cancel
                   </Button>
-                  <Button type="primary" htmlType="submit" loading={isSubmitting}>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isSubmitting}
+                  >
                     Schedule Appointment
                   </Button>
                 </Space>
@@ -765,16 +858,27 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             <List
               dataSource={appointments}
               renderItem={(appointment) => {
-                const isUpcoming = dayjs(appointment.scheduled_at).isAfter(dayjs());
-                const isPast = dayjs(appointment.scheduled_at).isBefore(dayjs());
-                const isToday = dayjs(appointment.scheduled_at).isSame(dayjs(), 'day');
-                
+                const isUpcoming = dayjs(appointment.scheduled_at).isAfter(
+                  dayjs(),
+                );
+                const isPast = dayjs(appointment.scheduled_at).isBefore(
+                  dayjs(),
+                );
+                const isToday = dayjs(appointment.scheduled_at).isSame(
+                  dayjs(),
+                  "day",
+                );
+
                 return (
                   <List.Item
                     key={appointment.id}
                     style={{
                       padding: "16px",
-                      background: isToday ? "#e6f7ff" : isUpcoming ? "#f6ffed" : "#fafafa",
+                      background: isToday
+                        ? "#e6f7ff"
+                        : isUpcoming
+                          ? "#f6ffed"
+                          : "#fafafa",
                       marginBottom: "8px",
                       borderRadius: "8px",
                       border: `1px solid ${isToday ? "#91d5ff" : isUpcoming ? "#b7eb8f" : "#d9d9d9"}`,
@@ -787,18 +891,28 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                           {isToday && (
                             <Badge
                               status="processing"
-                              style={{ position: "absolute", top: -5, right: -5 }}
+                              style={{
+                                position: "absolute",
+                                top: -5,
+                                right: -5,
+                              }}
                             />
                           )}
                         </div>
                       }
                       title={
                         <Space>
-                          <Tag color={interactionColors[appointment.appointment_type]}>
+                          <Tag
+                            color={
+                              interactionColors[appointment.appointment_type]
+                            }
+                          >
                             {appointment.appointment_type}
                           </Tag>
                           {isToday && <Tag color="blue">Today</Tag>}
-                          {isUpcoming && !isToday && <Tag color="green">Upcoming</Tag>}
+                          {isUpcoming && !isToday && (
+                            <Tag color="green">Upcoming</Tag>
+                          )}
                           {isPast && <Tag color="default">Past</Tag>}
                         </Space>
                       }
@@ -808,11 +922,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                             <Space>
                               <CalendarOutlined />
                               <Text strong>
-                                {dayjs(appointment.scheduled_at).format("DD-MMM-YY")}
+                                {dayjs(appointment.scheduled_at).format(
+                                  "DD-MMM-YY",
+                                )}
                               </Text>
                               <ClockCircleOutlined />
                               <Text strong>
-                                {dayjs(appointment.scheduled_at).format("hh:mm A")}
+                                {dayjs(appointment.scheduled_at).format(
+                                  "hh:mm A",
+                                )}
                               </Text>
                               <Text type="secondary">
                                 ({dayjs(appointment.scheduled_at).fromNow()})
@@ -827,15 +945,19 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                                 name={appointment.assigned_user?.name}
                                 size="small"
                               />
-                              <Text strong>{appointment.assigned_user?.name}</Text>
+                              <Text strong>
+                                {appointment.assigned_user?.name}
+                              </Text>
                             </Space>
                           </div>
-                          <div style={{ 
-                            padding: "8px 12px", 
-                            background: "#ffffff", 
-                            borderRadius: "4px",
-                            border: "1px solid #f0f0f0"
-                          }}>
+                          <div
+                            style={{
+                              padding: "8px 12px",
+                              background: "#ffffff",
+                              borderRadius: "4px",
+                              border: "1px solid #f0f0f0",
+                            }}
+                          >
                             <Text>{appointment.note}</Text>
                           </div>
                         </div>
@@ -888,10 +1010,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <span>
                 <ClockCircleOutlined /> Activities
                 {interactions.length > 0 && (
-                  <Tag
-                    color="blue"
-                    style={{ marginLeft: 8 }}
-                  >
+                  <Tag color="blue" style={{ marginLeft: 8 }}>
                     {interactions.length}
                   </Tag>
                 )}
@@ -905,10 +1024,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               <span>
                 <CalendarOutlined /> Appointments
                 {appointments.length > 0 && (
-                  <Tag
-                    color="green"
-                    style={{ marginLeft: 8 }}
-                  >
+                  <Tag color="green" style={{ marginLeft: 8 }}>
                     {appointments.length}
                   </Tag>
                 )}

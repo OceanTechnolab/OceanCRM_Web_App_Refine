@@ -1,6 +1,11 @@
 import type { AuthProvider } from "@refinedev/core";
 
-import { API_BASE_URL, axiosInstance } from "./data";
+import {
+  API_BASE_URL,
+  axiosInstance,
+  resetAuthState,
+  markRefineHandledError,
+} from "./data";
 import { setOrgList, clearOrgData, getOrgId } from "@/utilities/organization";
 
 /**
@@ -23,6 +28,9 @@ export const authCredentials = {
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
     try {
+      // Reset authentication state on login attempt
+      resetAuthState();
+
       const response = await axiosInstance.post(
         `${API_BASE_URL}/v1/auth/login`,
         {
@@ -72,15 +80,35 @@ export const authProvider: AuthProvider = {
     }
   },
   logout: async () => {
+    console.log("[LOGOUT] Starting logout process");
+
     try {
+      // Attempt logout API call
       await axiosInstance.post(`${API_BASE_URL}/v1/auth/logout`);
-    } catch (error) {
-      // Continue with logout even if API call fails
-      console.error("Logout error:", error);
+      console.log("[LOGOUT] API call successful");
+    } catch (error: any) {
+      // Check if this is an authentication-related error (expected if token expired)
+      const isAuthError =
+        error?.statusCode === 401 ||
+        error?.statusCode === 0 ||
+        error?.name === "AuthenticationInProgress" ||
+        error?.message === "Authentication in progress";
+
+      if (isAuthError) {
+        console.log(
+          "[LOGOUT] Skipping API call - session already invalid or in auth error state",
+        );
+      } else {
+        console.error("[LOGOUT] API call failed:", error);
+      }
     }
 
-    // Clear all organization data using centralized utility
+    // Always clear organization data regardless of API call result
+    console.log("[LOGOUT] Clearing organization data");
     clearOrgData();
+
+    // Reset authentication state so new login attempts work
+    resetAuthState();
 
     return {
       success: true,
@@ -88,68 +116,45 @@ export const authProvider: AuthProvider = {
     };
   },
   onError: async (error) => {
-    // Handle 401 Unauthorized with exact invalid/expired token message
-    if (error.statusCode === 401 || error.status === 401) {
-      const errorDetail = error.detail || "";
+    console.log("[AUTH] onError called with:", {
+      statusCode: error.statusCode,
+      message: error.message,
+      detail: error.detail,
+      name: error.name,
+    });
 
-      // Check for exact match with invalid/expired token error
-      if (errorDetail === AuthErrorMessages.INVALID_TOKEN) {
-        console.log(
-          "[AUTH] 401 Invalid/expired token (exact match) - clearing session and logging out",
-        );
+    // Ignore blocked requests during authentication - they're expected
+    if (
+      error.name === "AuthenticationInProgress" ||
+      error.message === "Authentication in progress"
+    ) {
+      console.log("[AUTH] Ignoring blocked request during authentication");
+      return { error };
+    }
 
-        // Clear all organization data
-        clearOrgData();
+    // Handle authentication errors (401 or 422 mapped to 401)
+    if (error.statusCode === 401) {
+      console.log(
+        "[AUTH] ✓ Refine's onError handling authentication error - triggering logout",
+      );
 
-        return {
-          logout: true,
-          redirectTo: "/login",
-          error: {
-            ...error,
-            message: AuthErrorMessages.SESSION_EXPIRED,
-            name: "Session Expired",
-          },
-        };
-      }
+      // Mark that Refine successfully handled the error
+      // This prevents the fallback timeout from triggering
+      markRefineHandledError();
 
-      // Fallback for other 401 errors
-      console.log("[AUTH] 401 Unauthorized - clearing session and logging out");
-
-      // Clear all organization data
-      clearOrgData();
-
+      // Return logout: true to trigger logout method
+      // The logout method will handle clearing data and API call
+      // According to Refine docs: when logout is true, redirectTo from logout method is used
       return {
         logout: true,
-        redirectTo: "/login",
-        error,
+        error: {
+          message: error.message || AuthErrorMessages.SESSION_EXPIRED,
+          name: "Authentication Error",
+        },
       };
     }
 
-    // Handle 422 Unprocessable Content with exact missing token message
-    if (error.statusCode === 422 || error.status === 422) {
-      const errorDetail = error.detail || "";
-
-      // Check for exact match with the missing token error message
-      if (errorDetail === AuthErrorMessages.MISSING_TOKEN) {
-        console.log(
-          "[AUTH] 422 Missing token (exact match) - clearing session and logging out",
-        );
-
-        // Clear all organization data
-        clearOrgData();
-
-        return {
-          logout: true,
-          redirectTo: "/login",
-          error: {
-            ...error,
-            message: AuthErrorMessages.SESSION_EXPIRED,
-            name: "Session Expired",
-          },
-        };
-      }
-    }
-
+    // For all other errors, just return the error without logging out
     return { error };
   },
   check: async () => {
