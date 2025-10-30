@@ -3,6 +3,7 @@ import type { DataProvider } from "@refinedev/core";
 import axios from "axios";
 import { stringify } from "query-string";
 import { getOrgId } from "@/utilities/organization";
+import { AuthErrorMessages } from "../auth";
 
 // Use environment variable for API URL, fallback to localhost for development
 export const API_BASE_URL =
@@ -65,16 +66,21 @@ axiosInstance.interceptors.response.use(
         "Network error. Please check your internet connection and try again.";
       baseError.name = "NetworkError";
     } else if (status === 401) {
-      // Unauthorized - session expired or invalid
+      // Unauthorized - check for exact invalid/expired token error
       console.error("[API] 401 Unauthorized:", errorDetail);
-      baseError.message =
-        errorDetail || "Session expired. Please log in again.";
-      baseError.name = "AuthenticationError";
+      if (errorDetail === AuthErrorMessages.INVALID_TOKEN) {
+        baseError.message = AuthErrorMessages.SESSION_EXPIRED;
+        baseError.name = "AuthenticationError";
+      } else {
+        baseError.message =
+          errorDetail || "Session expired. Please log in again.";
+        baseError.name = "AuthenticationError";
+      }
     } else if (status === 422) {
-      // Unprocessable Entity - validation error or missing token
-      if (errorDetail.includes("Missing token in request")) {
-        console.error("[API] 422 Missing token");
-        baseError.message = "Your session has expired. Please log in again.";
+      // Unprocessable Entity - check for exact missing token error
+      if (errorDetail === AuthErrorMessages.MISSING_TOKEN) {
+        console.error("[API] 422 Missing token (exact match)");
+        baseError.message = AuthErrorMessages.SESSION_EXPIRED;
         baseError.name = "AuthenticationError";
       } else {
         console.error("[API] 422 Validation error:", errorDetail);

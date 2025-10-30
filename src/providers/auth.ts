@@ -4,6 +4,15 @@ import { API_BASE_URL, axiosInstance } from "./data";
 import { setOrgList, clearOrgData, getOrgId } from "@/utilities/organization";
 
 /**
+ * Authentication error messages enum
+ */
+export enum AuthErrorMessages {
+  MISSING_TOKEN = "Missing token in request.",
+  INVALID_TOKEN = "Invalid or expired token.",
+  SESSION_EXPIRED = "Your session has expired. Please login again.",
+}
+
+/**
  * For demo purposes and to make it easier to test the app, you can use the following credentials:
  */
 export const authCredentials = {
@@ -79,8 +88,31 @@ export const authProvider: AuthProvider = {
     };
   },
   onError: async (error) => {
-    // Handle 401 Unauthorized - session expired or invalid
+    // Handle 401 Unauthorized with exact invalid/expired token message
     if (error.statusCode === 401 || error.status === 401) {
+      const errorDetail = error.detail || "";
+
+      // Check for exact match with invalid/expired token error
+      if (errorDetail === AuthErrorMessages.INVALID_TOKEN) {
+        console.log(
+          "[AUTH] 401 Invalid/expired token (exact match) - clearing session and logging out",
+        );
+
+        // Clear all organization data
+        clearOrgData();
+
+        return {
+          logout: true,
+          redirectTo: "/login",
+          error: {
+            ...error,
+            message: AuthErrorMessages.SESSION_EXPIRED,
+            name: "Session Expired",
+          },
+        };
+      }
+
+      // Fallback for other 401 errors
       console.log("[AUTH] 401 Unauthorized - clearing session and logging out");
 
       // Clear all organization data
@@ -93,13 +125,14 @@ export const authProvider: AuthProvider = {
       };
     }
 
-    // Handle 422 Unprocessable Content with missing token message
+    // Handle 422 Unprocessable Content with exact missing token message
     if (error.statusCode === 422 || error.status === 422) {
-      const errorMessage = error.message || error.detail || "";
+      const errorDetail = error.detail || "";
 
-      if (errorMessage.includes("Missing token in request")) {
+      // Check for exact match with the missing token error message
+      if (errorDetail === AuthErrorMessages.MISSING_TOKEN) {
         console.log(
-          "[AUTH] 422 Missing token - clearing session and logging out",
+          "[AUTH] 422 Missing token (exact match) - clearing session and logging out",
         );
 
         // Clear all organization data
@@ -110,7 +143,7 @@ export const authProvider: AuthProvider = {
           redirectTo: "/login",
           error: {
             ...error,
-            message: "Your session has expired. Please login again.",
+            message: AuthErrorMessages.SESSION_EXPIRED,
             name: "Session Expired",
           },
         };
