@@ -265,7 +265,7 @@ export const FacebookPage = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/meta/account`,
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api"}/v1/meta/account`,
         {
           method: "GET",
           credentials: "include",
@@ -301,7 +301,7 @@ export const FacebookPage = () => {
       onOk: () => {
         deleteAccount(
           {
-            url: `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/meta/account/${accountId}`,
+            url: `${import.meta.env.VITE_API_URL || "http://localhost:8000/api"}/v1/meta/account/${accountId}`,
             method: "delete",
             values: {},
           },
@@ -465,7 +465,7 @@ export const FacebookPage = () => {
         await new Promise((resolve, reject) => {
           createLeads(
             {
-              url: `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/lead`,
+              url: `${import.meta.env.VITE_API_URL || "http://localhost:8000/api"}/v1/lead`,
               method: "post",
               values: payload,
             },
@@ -524,7 +524,7 @@ export const FacebookPage = () => {
 
     createLeads(
       {
-        url: `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/meta/account`,
+        url: `${import.meta.env.VITE_API_URL || "http://localhost:8000/api"}/v1/meta/account`,
         method: "post",
         values: {
           user_token: userToken,
