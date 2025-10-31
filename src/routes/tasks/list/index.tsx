@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { type HttpError, useGo, useList, useUpdate } from "@refinedev/core";
 
 import type { DragEndEvent } from "@dnd-kit/core";
+import { Segmented } from "antd";
+import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
 
 import { KanbanAddCardButton } from "../components";
 import { KanbanBoard, KanbanBoardContainer } from "./kanban/board";
@@ -11,6 +13,9 @@ import { KanbanColumn, KanbanColumnSkeleton } from "./kanban/column";
 import { KanbanItem } from "./kanban/item";
 import { Text } from "@/components";
 import { LeadDetailModal } from "./lead-detail-modal";
+import { LeadFormModal } from "../../leads/list/lead-form-modal";
+
+type ViewMode = "stage" | "user";
 
 // Format currency for INR
 const formatCurrency = (amount: number) => {
@@ -68,6 +73,15 @@ type LeadStage = {
   totalPotential: number;
 };
 
+type LeadUserGroup = {
+  id: string;
+  name: string;
+  leads: Lead[];
+  totalPotential: number;
+};
+
+type ColumnGroup = LeadStage | LeadUserGroup;
+
 const STAGE_ORDER = [
   "Raw (Unqualified)",
   "New",
@@ -82,6 +96,9 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
   const go = useGo();
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("stage");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createStage, setCreateStage] = useState<string>("Raw (Unqualified)");
 
   const {
     result: { data: leadsData },
@@ -121,6 +138,47 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
     return grouped;
   }, [leadsData]);
 
+  // Group leads by assigned user
+  const leadsByUser = React.useMemo(() => {
+    if (!leadsData) return [];
+
+    // Get unique users
+    const usersMap = new Map<
+      string,
+      { id: string; name: string; leads: Lead[]; totalPotential: number }
+    >();
+
+    // Add "Unassigned" group
+    usersMap.set("unassigned", {
+      id: "unassigned",
+      name: "Unassigned",
+      leads: [],
+      totalPotential: 0,
+    });
+
+    leadsData.forEach((lead: Lead) => {
+      const userId = lead.assigned_user?.id || "unassigned";
+      const userName = lead.assigned_user?.name || "Unassigned";
+
+      if (!usersMap.has(userId)) {
+        usersMap.set(userId, {
+          id: userId,
+          name: userName,
+          leads: [],
+          totalPotential: 0,
+        });
+      }
+
+      const userGroup = usersMap.get(userId)!;
+      userGroup.leads.push(lead);
+      userGroup.totalPotential += lead.potential || 0;
+    });
+
+    return Array.from(usersMap.values());
+  }, [leadsData]);
+
+  const columns = viewMode === "stage" ? leadStages : leadsByUser;
+
   const { mutate: updateLead } = useUpdate<Lead, HttpError>({
     resource: "lead",
     mutationMode: "optimistic",
@@ -131,11 +189,12 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
   });
 
   const handleOnDragEnd = (event: DragEndEvent) => {
-    const newStage = event.over?.id as string;
+    const targetId = event.over?.id as string;
     const leadId = event.active.id as string;
-    const currentStage = event.active.data.current?.stage;
+    const currentValue =
+      event.active.data.current?.[viewMode === "stage" ? "stage" : "userId"];
 
-    if (currentStage === newStage) {
+    if (currentValue === targetId) {
       return;
     }
 
@@ -143,40 +202,58 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
     const lead = leadsData?.find((l: Lead) => l.id === leadId);
 
     if (!lead) return;
+
+    // Prepare the update values based on view mode
+    const updateValues: any = {
+      assigned_to:
+        viewMode === "user" && targetId !== "unassigned"
+          ? targetId
+          : lead.assigned_user?.id,
+      stage: viewMode === "stage" ? targetId : lead.stage,
+      tags: lead.tags || [],
+      source_id: lead.source?.id,
+      product_id: lead.product?.id,
+      potential: lead.potential,
+      requirements: lead.requirements,
+      notes: lead.notes,
+      business: {
+        id: lead.business.id,
+        business: lead.business.business,
+        name: lead.business.name,
+        title: lead.business.title || null,
+        designation: lead.business.designation || "",
+        mobile: lead.business.mobile,
+        email: lead.business.email,
+        website: lead.business.website || "",
+        address_line_1: lead.business.address_line_1 || "",
+        address_line_2: lead.business.address_line_2 || "",
+        city: lead.business.city || "",
+        country: lead.business.country || "",
+        gstin: lead.business.gstin || "",
+        code: lead.business.code || "",
+      },
+      since: lead.since,
+    };
+
+    // If moving to unassigned, set assigned_to to null
+    if (viewMode === "user" && targetId === "unassigned") {
+      updateValues.assigned_to = null;
+    }
+
     updateLead({
       id: leadId,
-      values: {
-        stage: newStage,
-        assigned_to: lead.assigned_user?.id,
-        tags: lead.tags || [],
-        source_id: lead.source?.id,
-        product_id: lead.product?.id,
-        potential: lead.potential,
-        requirements: lead.requirements,
-        notes: lead.notes,
-        business: {
-          id: lead.business.id,
-          business: lead.business.business,
-          name: lead.business.name,
-          title: lead.business.title || null,
-          designation: lead.business.designation || "",
-          mobile: lead.business.mobile,
-          email: lead.business.email,
-          website: lead.business.website || "",
-          address_line_1: lead.business.address_line_1 || "",
-          address_line_2: lead.business.address_line_2 || "",
-          city: lead.business.city || "",
-          country: lead.business.country || "",
-          gstin: lead.business.gstin || "",
-          code: lead.business.code || "",
-        },
-        since: lead.since,
-      } as any,
+      values: updateValues,
     });
   };
 
   const handleAddCard = (args: { stageId: string }) => {
-    go({ to: `/leads?create=true&stage=${args.stageId}`, type: "replace" });
+    setCreateStage(args.stageId);
+    setCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setCreateModalOpen(false);
+    setCreateStage("Raw (Unqualified)");
   };
 
   const handleCardClick = (lead: Lead) => {
@@ -193,14 +270,40 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
 
   return (
     <>
+      <div
+        style={{
+          padding: "16px 24px",
+          background: "#fff",
+          borderBottom: "1px solid #f0f0f0",
+        }}
+      >
+        <Segmented
+          value={viewMode}
+          onChange={(value) => setViewMode(value as ViewMode)}
+          options={[
+            {
+              label: "Group by Stage",
+              value: "stage",
+              icon: <AppstoreOutlined />,
+            },
+            {
+              label: "Group by Assigned To",
+              value: "user",
+              icon: <UserOutlined />,
+            },
+          ]}
+          size="large"
+        />
+      </div>
       <KanbanBoardContainer>
         <KanbanBoard onDragEnd={handleOnDragEnd}>
-          {leadStages.map((column) => {
+          {columns.map((column) => {
+            const columnTitle = "title" in column ? column.title : column.name;
             return (
               <KanbanColumn
                 key={column.id}
                 id={column.id}
-                title={column.title}
+                title={columnTitle}
                 count={column.leads.length}
                 description={
                   <Text
@@ -211,7 +314,12 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
                     {formatCurrency(column.totalPotential)}
                   </Text>
                 }
-                onAddClick={() => handleAddCard({ stageId: column.id })}
+                onAddClick={() =>
+                  handleAddCard({
+                    stageId:
+                      viewMode === "stage" ? column.id : "Raw (Unqualified)",
+                  })
+                }
               >
                 {isLoadingLeads && <ProjectCardSkeleton />}
                 {!isLoadingLeads &&
@@ -220,7 +328,12 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
                       <KanbanItem
                         key={lead.id}
                         id={lead.id}
-                        data={{ ...lead, stageId: column.id }}
+                        data={{
+                          ...lead,
+                          stageId: column.id,
+                          stage: lead.stage,
+                          userId: lead.assigned_user?.id || "unassigned",
+                        }}
                       >
                         <ProjectCardMemo
                           id={lead.id}
@@ -247,7 +360,10 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
                   <KanbanAddCardButton
                     onClick={() =>
                       handleAddCard({
-                        stageId: column.id,
+                        stageId:
+                          viewMode === "stage"
+                            ? column.id
+                            : "Raw (Unqualified)",
                       })
                     }
                   />
@@ -261,6 +377,12 @@ export const TasksListPage = ({ children }: React.PropsWithChildren) => {
         open={modalOpen}
         onClose={handleCloseModal}
         lead={selectedLead}
+      />
+      <LeadFormModal
+        action="create"
+        opened={createModalOpen}
+        onClose={handleCloseCreateModal}
+        leadData={{ stage: createStage }}
       />
       {children}
     </>

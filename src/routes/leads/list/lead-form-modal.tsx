@@ -120,14 +120,14 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
   useEffect(() => {
     if (action === "create" && opened && form && identity?.id) {
       form.setFieldsValue({
-        stage: "Raw (Unqualified)",
+        stage: leadData?.stage || "Raw (Unqualified)",
         title: "Mr.",
         since: dayjs(),
         country: "India",
         assigned_user_id: identity.id,
       });
     }
-  }, [action, opened, form, identity]);
+  }, [action, opened, form, identity, leadData]);
 
   const handleCreateSource = () => {
     if (!newSourceName.trim()) return;
