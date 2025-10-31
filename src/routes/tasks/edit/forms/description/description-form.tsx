@@ -1,31 +1,23 @@
 import { useForm } from "@refinedev/antd";
-import type { HttpError } from "@refinedev/core";
-import type { GetFields, GetVariables } from "@refinedev/nestjs-query";
+import { useParams } from "react-router";
 
 import MDEditor from "@uiw/react-md-editor";
 import { Button, Form, Space } from "antd";
 
-import type { Task } from "@/graphql/schema.types";
-import type {
-  UpdateTaskMutation,
-  UpdateTaskMutationVariables,
-} from "@/graphql/types";
-
-import { UPDATE_TASK_MUTATION } from "../../queries";
-
 type Props = {
   initialValues: {
-    description?: Task["description"];
+    description?: string;
   };
   cancelForm: () => void;
 };
 
 export const DescriptionForm = ({ initialValues, cancelForm }: Props) => {
-  const { formProps, saveButtonProps } = useForm<
-    GetFields<UpdateTaskMutation>,
-    HttpError,
-    Pick<GetVariables<UpdateTaskMutationVariables>, "description">
-  >({
+  const { id } = useParams<{ id: string }>();
+
+  const { formProps, saveButtonProps, form } = useForm({
+    resource: "tasks",
+    id,
+    action: "edit",
     queryOptions: {
       enabled: false,
     },
@@ -33,14 +25,11 @@ export const DescriptionForm = ({ initialValues, cancelForm }: Props) => {
     onMutationSuccess: () => {
       cancelForm();
     },
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
-    },
   });
 
   return (
     <>
-      <Form {...formProps} initialValues={initialValues}>
+      <Form {...formProps} form={form} initialValues={initialValues}>
         <Form.Item noStyle name="description">
           <MDEditor preview="edit" data-color-mode="light" height={250} />
         </Form.Item>

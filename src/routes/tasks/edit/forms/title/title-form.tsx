@@ -1,19 +1,12 @@
 import React from "react";
 
 import { useForm } from "@refinedev/antd";
-import { type HttpError, useInvalidate } from "@refinedev/core";
-import type { GetFields, GetVariables } from "@refinedev/nestjs-query";
+import { useInvalidate } from "@refinedev/core";
+import { useParams } from "react-router";
 
 import { Form, Skeleton } from "antd";
 
 import { Text } from "@/components";
-import type { Task } from "@/graphql/schema.types";
-import type {
-  UpdateTaskMutation,
-  UpdateTaskMutationVariables,
-} from "@/graphql/types";
-
-import { UPDATE_TASK_MUTATION } from "../../queries";
 
 const TitleInput = ({
   value,
@@ -40,19 +33,19 @@ const TitleInput = ({
 
 type Props = {
   initialValues: {
-    title?: Task["title"];
+    title?: string;
   };
   isLoading?: boolean;
 };
 
 export const TitleForm = ({ initialValues, isLoading }: Props) => {
+  const { id } = useParams<{ id: string }>();
   const invalidate = useInvalidate();
 
-  const { formProps } = useForm<
-    GetFields<UpdateTaskMutation>,
-    HttpError,
-    Pick<GetVariables<UpdateTaskMutationVariables>, "title">
-  >({
+  const { formProps, form } = useForm({
+    resource: "tasks",
+    id,
+    action: "edit",
     queryOptions: {
       enabled: false,
     },
@@ -64,14 +57,11 @@ export const TitleForm = ({ initialValues, isLoading }: Props) => {
     onMutationSuccess: () => {
       invalidate({ invalidates: ["list"], resource: "tasks" });
     },
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
-    },
   });
 
   React.useEffect(() => {
-    formProps.form?.setFieldsValue(initialValues);
-  }, [initialValues.title]);
+    form?.setFieldsValue(initialValues);
+  }, [initialValues.title, form]);
 
   if (isLoading) {
     return (
@@ -84,7 +74,7 @@ export const TitleForm = ({ initialValues, isLoading }: Props) => {
   }
 
   return (
-    <Form {...formProps} initialValues={initialValues}>
+    <Form {...formProps} form={form} initialValues={initialValues}>
       <Form.Item noStyle name="title">
         <TitleInput />
       </Form.Item>

@@ -1,34 +1,23 @@
-import { useForm, useSelect } from "@refinedev/antd";
-import type { HttpError } from "@refinedev/core";
-import type {
-  GetFields,
-  GetFieldsFromList,
-  GetVariables,
-} from "@refinedev/nestjs-query";
+import { useForm } from "@refinedev/antd";
+import { useList } from "@refinedev/core";
+import { useParams } from "react-router";
 
 import { FlagOutlined } from "@ant-design/icons";
 import { Checkbox, Form, Select, Space } from "antd";
 
 import { AccordionHeaderSkeleton } from "@/components";
-import { TASK_STAGES_SELECT_QUERY } from "@/graphql/queries";
-import type {
-  TaskStagesSelectQuery,
-  UpdateTaskMutation,
-  UpdateTaskMutationVariables,
-} from "@/graphql/types";
-
-import { UPDATE_TASK_MUTATION } from "../../queries";
 
 type Props = {
   isLoading?: boolean;
 };
 
 export const StageForm = ({ isLoading }: Props) => {
-  const { formProps } = useForm<
-    GetFields<UpdateTaskMutation>,
-    HttpError,
-    Pick<GetVariables<UpdateTaskMutationVariables>, "stageId" | "completed">
-  >({
+  const { id } = useParams<{ id: string }>();
+
+  const { formProps, form } = useForm({
+    resource: "tasks",
+    id,
+    action: "edit",
     queryOptions: {
       enabled: false,
     },
@@ -36,14 +25,10 @@ export const StageForm = ({ isLoading }: Props) => {
       enabled: true,
       debounce: 0,
     },
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
-    },
   });
 
-  const { selectProps } = useSelect<GetFieldsFromList<TaskStagesSelectQuery>>({
+  const { query: stagesQuery } = useList({
     resource: "taskStages",
-
     filters: [
       {
         field: "title",
@@ -51,22 +36,24 @@ export const StageForm = ({ isLoading }: Props) => {
         value: ["TODO", "IN PROGRESS", "IN REVIEW", "DONE"],
       },
     ],
-
     sorters: [
       {
         field: "createdAt",
         order: "asc",
       },
     ],
-
-    meta: {
-      gqlQuery: TASK_STAGES_SELECT_QUERY,
-    },
-
     pagination: {
       mode: "server",
     },
   });
+
+  const stages = stagesQuery.data?.data || [];
+  const stageOptions = stages
+    .map((stage: any) => ({
+      label: stage.title,
+      value: stage.id,
+    }))
+    .concat([{ label: "Unassigned", value: null as any }]);
 
   if (isLoading) {
     return <AccordionHeaderSkeleton />;
@@ -75,33 +62,24 @@ export const StageForm = ({ isLoading }: Props) => {
   return (
     <div style={{ padding: "12px 24px", borderBottom: "1px solid #d9d9d9" }}>
       <Form
+        {...formProps}
+        form={form}
         layout="inline"
         style={{
           justifyContent: "space-between",
           alignItems: "center",
         }}
-        {...formProps}
       >
         <Space size={5}>
           <FlagOutlined />
-          <Form.Item
-            noStyle
-            name={["stageId"]}
-            initialValue={formProps?.initialValues?.stage?.id}
-          >
+          <Form.Item noStyle name="stageId">
             <Select
-              {...selectProps}
+              loading={stagesQuery.isLoading}
+              options={stageOptions}
               popupMatchSelectWidth={false}
-              options={selectProps.options?.concat([
-                {
-                  label: "Unassigned",
-                  value: null,
-                },
-              ])}
               bordered={false}
               showSearch={false}
               placeholder="Select a stage"
-              onSearch={undefined}
               size="small"
             />
           </Form.Item>

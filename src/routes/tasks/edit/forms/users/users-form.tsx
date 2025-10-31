@@ -1,35 +1,18 @@
-import { useForm, useSelect } from "@refinedev/antd";
+import { useForm } from "@refinedev/antd";
 import type { HttpError } from "@refinedev/core";
-import type {
-  GetFields,
-  GetFieldsFromList,
-  GetVariables,
-} from "@refinedev/nestjs-query";
 
 import { Button, Form, Select, Space } from "antd";
-
-import { USERS_SELECT_QUERY } from "@/graphql/queries";
-import type {
-  UpdateTaskMutation,
-  UpdateTaskMutationVariables,
-  UsersSelectQuery,
-} from "@/graphql/types";
-
-import { UPDATE_TASK_MUTATION } from "../../queries";
+import { useUsers } from "@/services/user.service";
 
 type Props = {
   initialValues: {
-    userIds?: { label: string; value: string }[];
+    userIds?: string[];
   };
   cancelForm: () => void;
 };
 
 export const UsersForm = ({ initialValues, cancelForm }: Props) => {
-  const { formProps, saveButtonProps } = useForm<
-    GetFields<UpdateTaskMutation>,
-    HttpError,
-    Pick<GetVariables<UpdateTaskMutationVariables>, "userIds">
-  >({
+  const { formProps, saveButtonProps, form } = useForm({
     queryOptions: {
       enabled: false,
     },
@@ -37,24 +20,13 @@ export const UsersForm = ({ initialValues, cancelForm }: Props) => {
     onMutationSuccess: () => {
       cancelForm();
     },
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
-    },
   });
 
-  const { selectProps } = useSelect<GetFieldsFromList<UsersSelectQuery>>({
-    resource: "users",
-
-    meta: {
-      gqlQuery: USERS_SELECT_QUERY,
-    },
-
-    optionLabel: "name",
-
-    pagination: {
-      mode: "server",
-    },
-  });
+  // Use REST API to fetch users
+  const {
+    query: { data: usersData, isLoading: loadingUsers },
+  } = useUsers();
+  const users = usersData?.data || [];
 
   return (
     <div
@@ -67,16 +39,25 @@ export const UsersForm = ({ initialValues, cancelForm }: Props) => {
     >
       <Form
         {...formProps}
+        form={form}
         style={{ width: "100%" }}
         initialValues={initialValues}
       >
         <Form.Item noStyle name="userIds">
           <Select
-            {...selectProps}
             className="kanban-users-form-select"
             dropdownStyle={{ padding: "0px" }}
             style={{ width: "100%" }}
             mode="multiple"
+            loading={loadingUsers}
+            placeholder="Select users"
+            options={users.map((user) => ({
+              label: user.name,
+              value: user.id,
+            }))}
+            filterOption={(input, option) =>
+              (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+            }
           />
         </Form.Item>
       </Form>

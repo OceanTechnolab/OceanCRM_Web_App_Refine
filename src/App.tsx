@@ -27,14 +27,9 @@ import {
   setLogoutCallback,
 } from "@/providers";
 import {
-  CompanyCreatePage,
-  CompanyEditPage,
-  CompanyListPage,
-  ContactListPage,
   DashboardPage,
   LeadListPage,
   LoginPage,
-  TasksCreatePage,
   TasksEditPage,
   TasksListPage,
 } from "@/routes";
@@ -125,7 +120,6 @@ const App = () => {
               </TasksListPage>
             }
           >
-            <Route path="new" element={<TasksCreatePage />} />
             <Route path="edit/:id" element={<TasksEditPage />} />
           </Route>
 

@@ -1,1 +1,0 @@
-export { ContactListPage } from "./list";

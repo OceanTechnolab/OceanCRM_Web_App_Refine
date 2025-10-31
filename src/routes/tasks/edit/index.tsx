@@ -1,7 +1,8 @@
 import { useState } from "react";
 
-import { DeleteButton, useModalForm } from "@refinedev/antd";
-import { useNavigation } from "@refinedev/core";
+import { DeleteButton } from "@refinedev/antd";
+import { useNavigation, useOne } from "@refinedev/core";
+import { useParams } from "react-router";
 
 import {
   AlignLeftOutlined,
@@ -11,7 +12,6 @@ import {
 import { Modal } from "antd";
 
 import { Accordion } from "@/components";
-import type { Task } from "@/graphql/schema.types";
 
 import { DescriptionForm } from "./forms/description/description-form";
 import { DescriptionHeader } from "./forms/description/description-header";
@@ -21,40 +21,39 @@ import { StageForm } from "./forms/stage/stage-form";
 import { TitleForm } from "./forms/title/title-form";
 import { UsersForm } from "./forms/users/users-form";
 import { UsersHeader } from "./forms/users/users-header";
-import { UPDATE_TASK_MUTATION } from "./queries";
 
 export const TasksEditPage = () => {
   const [activeKey, setActiveKey] = useState<string | undefined>();
+  const { id } = useParams<{ id: string }>();
 
   const { list } = useNavigation();
-  const {
-    modalProps,
-    close,
-    query: queryResult,
-  } = useModalForm<Task>({
-    action: "edit",
-    defaultVisible: true,
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
-    },
+
+  // Use REST API to fetch task data
+  const { query: taskQuery } = useOne({
+    resource: "tasks",
+    id: id!,
   });
 
-  const { description, dueDate, users, title } = queryResult?.data?.data ?? {};
-  const isLoading = queryResult?.isLoading ?? true;
+  const task = taskQuery.data?.data;
+  const isLoading = taskQuery.isLoading;
+  const { description, dueDate, users, title } = task ?? {};
+
+  const handleClose = () => {
+    list("tasks", "replace");
+  };
 
   return (
     <Modal
-      {...modalProps}
+      open={true}
       className="kanban-update-modal"
-      onCancel={() => {
-        close();
-        list("tasks", "replace");
-      }}
+      onCancel={handleClose}
       title={<TitleForm initialValues={{ title }} isLoading={isLoading} />}
       width={586}
       footer={
         <DeleteButton
           type="link"
+          resource="tasks"
+          recordItemId={id}
           onSuccess={() => {
             list("tasks", "replace");
           }}
@@ -103,10 +102,7 @@ export const TasksEditPage = () => {
       >
         <UsersForm
           initialValues={{
-            userIds: users?.map((user) => ({
-              label: user.name,
-              value: user.id,
-            })),
+            userIds: users?.map((user: any) => user.id) ?? [],
           }}
           cancelForm={() => setActiveKey(undefined)}
         />

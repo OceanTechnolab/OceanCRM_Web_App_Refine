@@ -1,40 +1,29 @@
 import { useForm } from "@refinedev/antd";
-import type { HttpError } from "@refinedev/core";
-import type { GetFields, GetVariables } from "@refinedev/nestjs-query";
+import { useParams } from "react-router";
 
 import { Button, DatePicker, Form, Space } from "antd";
 import dayjs from "dayjs";
 
-import type { Task } from "@/graphql/schema.types";
-import type {
-  UpdateTaskMutation,
-  UpdateTaskMutationVariables,
-} from "@/graphql/types";
-
-import { UPDATE_TASK_MUTATION } from "../../queries";
-
 type Props = {
   initialValues: {
-    dueDate?: Task["dueDate"];
+    dueDate?: string;
   };
   cancelForm: () => void;
 };
 
 export const DueDateForm = ({ initialValues, cancelForm }: Props) => {
-  const { formProps, saveButtonProps } = useForm<
-    GetFields<UpdateTaskMutation>,
-    HttpError,
-    Pick<GetVariables<UpdateTaskMutationVariables>, "dueDate">
-  >({
+  const { id } = useParams<{ id: string }>();
+
+  const { formProps, saveButtonProps, form } = useForm({
+    resource: "tasks",
+    id,
+    action: "edit",
     queryOptions: {
       enabled: false,
     },
     redirect: false,
     onMutationSuccess: () => {
       cancelForm();
-    },
-    meta: {
-      gqlMutation: UPDATE_TASK_MUTATION,
     },
   });
 
@@ -46,7 +35,7 @@ export const DueDateForm = ({ initialValues, cancelForm }: Props) => {
         justifyContent: "space-between",
       }}
     >
-      <Form {...formProps} initialValues={initialValues}>
+      <Form {...formProps} form={form} initialValues={initialValues}>
         <Form.Item
           noStyle
           name="dueDate"
