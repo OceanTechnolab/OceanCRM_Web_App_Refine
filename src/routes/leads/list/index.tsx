@@ -1,12 +1,23 @@
-import { DeleteButton, EditButton, List, useTable, useSelect, FilterDropdown } from "@refinedev/antd";
+import {
+  DeleteButton,
+  EditButton,
+  List,
+  useTable,
+  useSelect,
+  FilterDropdown,
+} from "@refinedev/antd";
 import { Input, Space, Table, Tag, Button, Select } from "antd";
 import { useState } from "react";
-import { EyeOutlined, FacebookOutlined, FilterOutlined } from "@ant-design/icons";
+import {
+  EyeOutlined,
+  FacebookOutlined,
+  FilterOutlined,
+} from "@ant-design/icons";
 import { CustomAvatar } from "@/components/custom-avatar";
 import { Text } from "@/components/text";
 import { QuickActivityButton } from "@/components/quick-activity-button";
 import { LeadFormModal } from "@/routes/leads/list/lead-form-modal";
-import { LeadDetailModal } from "@/components/lead-detail-modal";
+import { LeadDetailModal } from "@/routes/leads";
 import { MetaImportModal } from "@/components/meta-import-modal";
 
 const { Search } = Input;
@@ -85,14 +96,14 @@ export const LeadListPage = () => {
           },
         }}
       >
-        <Table 
-          {...tableProps} 
+        <Table
+          {...tableProps}
           rowKey="id"
           pagination={{
             ...tableProps.pagination,
             showTotal: (total: number) => `${total} leads in total`,
             showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '100', ],
+            pageSizeOptions: ["10", "20", "100"],
           }}
         >
           <Table.Column
