@@ -629,7 +629,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             <Empty
               description="No activities yet"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
+            >
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setIsAddingActivity(true)}
+              >
+                Schedule First Activity
+              </Button>
+            </Empty>
           ) : (
             <Timeline
               items={interactions.map((interaction) => ({
