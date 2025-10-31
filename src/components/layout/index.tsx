@@ -10,7 +10,7 @@ export const Layout = ({ children }: React.PropsWithChildren) => {
       <ThemedLayout
         Header={Header}
         Title={(titleProps) => {
-          return <ThemedTitleV2 {...titleProps} text="Refine" />;
+          return <ThemedTitleV2 {...titleProps} text="Ocean CRM" />;
         }}
       >
         {children}

@@ -2,7 +2,6 @@ export * from "./accordion";
 export * from "./custom-avatar";
 export * from "./icon";
 export * from "./layout";
-export * from "./lead-detail-modal";
 export * from "./meta-import-modal";
 export * from "./pagination-total";
 export * from "./select-option-with-avatar";

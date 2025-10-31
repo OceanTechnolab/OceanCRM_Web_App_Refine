@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLogout, useUpdate, useInvalidate } from "@refinedev/core";
+import { useEffect } from "react";
+import { useLogout } from "@refinedev/core";
 
 import { CloseOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, Spin, message, Avatar } from "antd";
@@ -18,15 +18,10 @@ type Props = {
 
 export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
   const [form] = Form.useForm();
-  const [isSaving, setIsSaving] = useState(false);
   const { mutate: logout } = useLogout();
-  const invalidate = useInvalidate();
 
   // Use the service hook to fetch logged user data
   const { data: userData, isLoading, error, refetch } = useLoggedUser();
-
-  // Use Refine's useUpdate hook for updating user data
-  const { mutate: updateUser } = useUpdate();
 
   useEffect(() => {
     if (opened && userId) {
@@ -53,39 +48,6 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
       message.error("Failed to load user data");
     }
   }, [error]);
-
-  const handleSave = (values: any) => {
-    setIsSaving(true);
-    updateUser(
-      {
-        resource: "user",
-        id: userId,
-        values: {
-          name: values.name,
-          email: values.email,
-          mobile: values.mobile,
-        },
-      },
-      {
-        onSuccess: () => {
-          message.success("Account settings updated successfully");
-          // Invalidate logged user cache to refresh data
-          invalidate({
-            resource: "user",
-            invalidates: ["list"],
-          });
-          refetch(); // Refresh the logged user data
-          setOpened(false);
-          setIsSaving(false);
-        },
-        onError: (error: any) => {
-          console.error("Error updating user data:", error);
-          message.error(error.message || "Failed to update account settings");
-          setIsSaving(false);
-        },
-      },
-    );
-  };
 
   const closeModal = () => {
     setOpened(false);
@@ -164,39 +126,15 @@ export const AccountSettings = ({ opened, setOpened, userId }: Props) => {
               }}
             />
           )}
-          <Form form={form} layout="vertical" onFinish={handleSave}>
-            <Form.Item
-              label="Name"
-              name="name"
-              rules={[{ required: true, message: "Please enter your name" }]}
-            >
-              <Input placeholder="Name" />
+          <Form form={form} layout="vertical">
+            <Form.Item label="Name" name="name">
+              <Input placeholder="Name" disabled />
             </Form.Item>
-            <Form.Item
-              label="Email"
-              name="email"
-              rules={[
-                { required: true, message: "Please enter your email" },
-                { type: "email", message: "Please enter a valid email" },
-              ]}
-            >
-              <Input placeholder="Email" />
+            <Form.Item label="Email" name="email">
+              <Input placeholder="Email" disabled />
             </Form.Item>
             <Form.Item label="Mobile" name="mobile">
-              <Input placeholder="Mobile" />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isSaving}
-                style={{
-                  display: "block",
-                  marginLeft: "auto",
-                }}
-              >
-                Save
-              </Button>
+              <Input placeholder="Mobile" disabled />
             </Form.Item>
           </Form>
         </Card>
