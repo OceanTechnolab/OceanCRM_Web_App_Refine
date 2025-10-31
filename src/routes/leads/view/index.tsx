@@ -19,6 +19,7 @@ import {
   Divider,
   List,
   Badge,
+  Popconfirm,
 } from "antd";
 import {
   PhoneOutlined,
@@ -36,6 +37,7 @@ import {
   WhatsAppOutlined,
   CopyOutlined,
   DeleteOutlined,
+  ContactsOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -49,9 +51,15 @@ import {
   useAppointmentsByLeadId,
   useCreateAppointment,
 } from "@/services/appointment.service";
+import {
+  useContactsByBusinessId,
+  useCreateContact,
+} from "@/services/contact.service";
 import { useUsers } from "@/services/user.service";
+import { useDelete } from "@refinedev/core";
 import type { Interaction, InteractionType } from "@/interfaces/interaction";
 import type { Appointment, AppointmentType } from "@/interfaces/appointment";
+import type { Contact } from "@/interfaces/contact";
 
 dayjs.extend(relativeTime);
 
@@ -95,8 +103,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState("overview");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
+  const [isAddingContact, setIsAddingContact] = useState(false);
   const [form] = Form.useForm();
   const [appointmentForm] = Form.useForm();
+  const [contactForm] = Form.useForm();
 
   // Use passed leadData directly instead of fetching
   const lead = leadData;
@@ -128,6 +138,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   } = useUsers();
   const users = usersData?.data || [];
 
+  // Contacts - automatically fetched and cached
+  const {
+    result: contactsResult,
+    query: { isLoading: contactsLoading },
+  } = useContactsByBusinessId(open ? lead?.business?.id : undefined);
+  const contacts = contactsResult?.data || [];
+
   // Create interaction mutation - automatic invalidation and notifications
   const {
     mutate: createInteraction,
@@ -140,16 +157,27 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     mutation: { isPending: isCreatingAppointment },
   } = useCreateAppointment();
 
+  // Create contact mutation - automatic invalidation and notifications
+  const {
+    mutate: createContact,
+    mutation: { isPending: isCreatingContact },
+  } = useCreateContact();
+
+  // Delete contact mutation
+  const { mutate: deleteContact } = useDelete();
+
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
       setActiveTab("overview");
       setIsAddingActivity(false);
       setIsAddingAppointment(false);
+      setIsAddingContact(false);
       form.resetFields();
       appointmentForm.resetFields();
+      contactForm.resetFields();
     }
-  }, [open, form, appointmentForm]);
+  }, [open, form, appointmentForm, contactForm]);
 
   const handleAddInteraction = (values: any) => {
     if (!leadId) return;
@@ -192,6 +220,34 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         },
       },
     );
+  };
+
+  const handleAddContact = (values: any) => {
+    if (!lead?.business?.id) return;
+
+    const payload = {
+      business_id: lead.business.id,
+      name: values.name,
+      mobile: values.mobile,
+      email: values.email,
+    };
+
+    createContact(
+      { values: payload },
+      {
+        onSuccess: () => {
+          setIsAddingContact(false);
+          contactForm.resetFields();
+        },
+      },
+    );
+  };
+
+  const handleDeleteContact = (contactId: string) => {
+    deleteContact({
+      resource: "contact",
+      id: contactId,
+    });
   };
 
   const getStageColor = (stage: string) => {
@@ -913,6 +969,232 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     );
   };
 
+  const renderContactsTab = () => {
+    return (
+      <div style={{ maxHeight: "60vh", overflowY: "auto", padding: "8px" }}>
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsAddingContact(!isAddingContact)}
+            block
+          >
+            {isAddingContact ? "Cancel" : "Add New Contact"}
+          </Button>
+        </div>
+
+        {/* Contact Form */}
+        {isAddingContact && (
+          <Card size="small" style={{ marginBottom: 16 }} title="New Contact">
+            <Form
+              form={contactForm}
+              layout="vertical"
+              onFinish={handleAddContact}
+            >
+              <Form.Item
+                name="name"
+                label="Name"
+                rules={[{ required: true, message: "Please enter name" }]}
+              >
+                <Input
+                  placeholder="Enter contact name"
+                  size="large"
+                  prefix={<UserOutlined />}
+                />
+              </Form.Item>
+
+              <Form.Item name="mobile" label="Mobile">
+                <Input
+                  placeholder="+911234567890"
+                  size="large"
+                  prefix={<PhoneOutlined />}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: "Please enter email" },
+                  { type: "email", message: "Please enter a valid email" },
+                ]}
+              >
+                <Input
+                  placeholder="email@example.com"
+                  size="large"
+                  prefix={<MailOutlined />}
+                />
+              </Form.Item>
+
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Space style={{ width: "100%", justifyContent: "flex-end" }}>
+                  <Button
+                    onClick={() => {
+                      setIsAddingContact(false);
+                      contactForm.resetFields();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isCreatingContact}
+                  >
+                    Add Contact
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </Card>
+        )}
+
+        {/* Contacts List */}
+        <Card
+          size="small"
+          title={`Contacts (${contacts.length})`}
+          loading={contactsLoading}
+        >
+          {contacts.length === 0 ? (
+            <Empty
+              description="No contacts yet"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            >
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setIsAddingContact(true)}
+              >
+                Add First Contact
+              </Button>
+            </Empty>
+          ) : (
+            <List
+              dataSource={contacts}
+              renderItem={(contact) => (
+                <List.Item
+                  key={contact.id}
+                  style={{
+                    padding: "16px",
+                    background: "#fafafa",
+                    marginBottom: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #d9d9d9",
+                  }}
+                  actions={[
+                    <Popconfirm
+                      key="delete"
+                      title="Delete Contact"
+                      description="Are you sure you want to delete this contact?"
+                      onConfirm={() => handleDeleteContact(contact.id!)}
+                      okText="Yes"
+                      cancelText="No"
+                      okButtonProps={{ danger: true }}
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        size="small"
+                      />
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <CustomAvatar name={contact.name || "N/A"} size="large" />
+                    }
+                    title={
+                      <Space direction="vertical" size={4}>
+                        <Text strong style={{ fontSize: "16px" }}>
+                          {contact.name || "N/A"}
+                        </Text>
+                      </Space>
+                    }
+                    description={
+                      <Space direction="vertical" size={8}>
+                        {contact.mobile && (
+                          <Space>
+                            <PhoneOutlined />
+                            <Text>{contact.mobile}</Text>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={
+                                <WhatsAppOutlined
+                                  style={{ color: "#25D366" }}
+                                />
+                              }
+                              onClick={() => {
+                                const phone = contact.mobile?.replace(
+                                  /\D/g,
+                                  "",
+                                );
+                                window.open(`https://wa.me/${phone}`, "_blank");
+                              }}
+                            />
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={
+                                <PhoneOutlined style={{ color: "#1890ff" }} />
+                              }
+                              onClick={() => {
+                                window.location.href = `tel:${contact.mobile}`;
+                              }}
+                            />
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined />}
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  contact.mobile || "",
+                                );
+                                message.success("Mobile number copied!");
+                              }}
+                            />
+                          </Space>
+                        )}
+                        {contact.email && (
+                          <Space>
+                            <MailOutlined />
+                            <Text>{contact.email}</Text>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={
+                                <MailOutlined style={{ color: "#1890ff" }} />
+                              }
+                              onClick={() => {
+                                window.location.href = `mailto:${contact.email}`;
+                              }}
+                            />
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CopyOutlined />}
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  contact.email || "",
+                                );
+                                message.success("Email copied!");
+                              }}
+                            />
+                          </Space>
+                        )}
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <Modal
       title={
@@ -971,6 +1253,20 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
               </span>
             ),
             children: renderAppointmentsTab(),
+          },
+          {
+            key: "contacts",
+            label: (
+              <span>
+                <ContactsOutlined /> Contacts
+                {contacts.length > 0 && (
+                  <Tag color="purple" style={{ marginLeft: 8 }}>
+                    {contacts.length}
+                  </Tag>
+                )}
+              </span>
+            ),
+            children: renderContactsTab(),
           },
         ]}
       />

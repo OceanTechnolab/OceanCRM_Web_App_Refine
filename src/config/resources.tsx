@@ -56,4 +56,10 @@ export const resources: IResourceItem[] = [
       hide: true, // Hide from menu
     },
   },
+  {
+    name: "contact",
+    meta: {
+      hide: true, // Hide from menu
+    },
+  },
 ];

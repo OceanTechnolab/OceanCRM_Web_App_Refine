@@ -305,6 +305,7 @@ export const dataProvider: DataProvider = {
         q?: string;
         assigned_user_id?: string;
         lead_id?: string;
+        business_id?: string;
       } = {};
 
       if (mode === "server") {
@@ -335,6 +336,10 @@ export const dataProvider: DataProvider = {
             // Handle lead_id filter for interactions and appointments
             else if (filter.field === "lead_id") {
               query.lead_id = filter.value;
+            }
+            // Handle business_id filter for contacts
+            else if (filter.field === "business_id") {
+              query.business_id = filter.value;
             }
           }
         });
