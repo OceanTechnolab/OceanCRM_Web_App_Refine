@@ -33,6 +33,7 @@ import {
   TasksEditPage,
   TasksListPage,
 } from "@/routes";
+import { FacebookPage } from "@/routes/facebook";
 
 import "@ant-design/v5-patch-for-react-19";
 import "@refinedev/antd/dist/reset.css";
@@ -127,6 +128,8 @@ const App = () => {
             <Route index element={<LeadListPage />} />
             {/* View is now handled via modal in LeadListPage */}
           </Route>
+
+          <Route path="facebook" element={<FacebookPage />} />
 
           <Route path="*" element={<ErrorComponent />} />
         </Route>

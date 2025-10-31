@@ -6,6 +6,7 @@ import {
   ShopOutlined,
   TeamOutlined,
   RocketOutlined,
+  FacebookOutlined,
 } from "@ant-design/icons";
 
 export const resources: IResourceItem[] = [
@@ -35,6 +36,14 @@ export const resources: IResourceItem[] = [
     meta: {
       label: "Tasks",
       icon: <ProjectOutlined />,
+    },
+  },
+  {
+    name: "facebook",
+    list: "/app/facebook",
+    meta: {
+      label: "Facebook",
+      icon: <FacebookOutlined />,
     },
   },
   // Meta resources (not displayed in menu, but available for data hooks)
