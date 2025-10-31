@@ -81,6 +81,9 @@ export const FacebookPage = () => {
     AutoImportAccount[]
   >([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [formsPageSize, setFormsPageSize] = useState(10);
+  const [accountsPageSize, setAccountsPageSize] = useState(10);
+  const [leadsPageSize, setLeadsPageSize] = useState(10);
 
   // Get current user identity
   const { data: identity } = useGetIdentity<{ id: string }>();
@@ -833,9 +836,11 @@ export const FacebookPage = () => {
                 columns={formsColumns}
                 rowKey="id"
                 pagination={{
-                  pageSize: 10,
+                  pageSize: formsPageSize,
                   showSizeChanger: true,
                   showTotal: (total) => `Total ${total} forms`,
+                  onShowSizeChange: (_, size) => setFormsPageSize(size),
+                  pageSizeOptions: ["10", "20", "50", "100"],
                 }}
               />
             )}
@@ -876,9 +881,11 @@ export const FacebookPage = () => {
             columns={autoImportColumns}
             rowKey="id"
             pagination={{
-              pageSize: 10,
+              pageSize: accountsPageSize,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} accounts`,
+              onShowSizeChange: (_, size) => setAccountsPageSize(size),
+              pageSizeOptions: ["10", "20", "50", "100"],
             }}
           />
         )}
@@ -977,9 +984,11 @@ export const FacebookPage = () => {
               columns={leadsColumns}
               rowKey="id"
               pagination={{
-                pageSize: 10,
+                pageSize: leadsPageSize,
                 showSizeChanger: true,
                 showTotal: (total) => `Total ${total} leads`,
+                onShowSizeChange: (_, size) => setLeadsPageSize(size),
+                pageSizeOptions: ["10", "20", "50", "100"],
               }}
               scroll={{ x: 800 }}
             />
